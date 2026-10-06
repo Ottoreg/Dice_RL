@@ -13,6 +13,8 @@ export type FaceKind =
   | 'cleave'
   | 'rebirth'
   | 'staff'
+  | 'bone'
+  | 'skull'
   | 'blank';
 
 export interface Face {
@@ -20,7 +22,7 @@ export interface Face {
   value: number;
 }
 
-export type ClassId = 'warrior' | 'mage' | 'rogue';
+export type ClassId = 'warrior' | 'mage' | 'rogue' | 'skeleton';
 
 export interface Fighter {
   hp: number;
@@ -61,11 +63,15 @@ export interface DieState {
   locked: boolean;
   used: boolean;
   mult: number;
+  /** For joker faces (🦴): the face type they copy this turn. */
+  asKind?: FaceKind;
 }
 
 export interface Combo {
   kind: FaceKind;
   count: number;
+  /** How many jokers (🦴) joined this group. */
+  jokers: number;
   mult: number;
   name: string;
 }
@@ -125,6 +131,10 @@ export interface CombatState {
   anims: AnimEvent[];
   /** Whether the player was already Vulnerable when the current enemy turn began. */
   vulnCarry: boolean;
+  /** Skeleton passive still available in this run. */
+  reviveAvailable: boolean;
+  /** The skeleton passive triggered during this fight. */
+  revived: boolean;
 }
 
 export type NodeType = 'combat' | 'elite' | 'rest' | 'treasure' | 'boss';
@@ -144,4 +154,6 @@ export interface RunState {
   map: MapNode[][];
   floor: number;
   lane: number | null;
+  /** The skeleton's once-per-run revive has been spent. */
+  reviveUsed?: boolean;
 }

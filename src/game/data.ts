@@ -15,6 +15,18 @@ export const FACE_INFO: Record<FaceKind, { icon: string; name: string; color: st
   vamp: { icon: '🩸', name: 'Drain', color: '#c2185b', desc: (v) => `Inflige ${v} dégâts, soigne la moitié.` },
   venom: { icon: '☣️', name: 'Venin', color: '#c6ff00', desc: (v) => `Applique ${v} Poison, puis double le Poison de la cible.` },
   staff: { icon: '🪄', name: 'Sceptre', color: '#9575ff', desc: (v) => `Inflige ${v} dégâts à la cible et donne 1 mana.` },
+  bone: {
+    icon: '🦴',
+    name: 'Os',
+    color: '#d9cba3',
+    desc: (v) => `Joker : rejoint votre plus grand groupe de faces et agit comme elles, avec une valeur de ${v}.`,
+  },
+  skull: {
+    icon: '💀',
+    name: 'Crâne hurlant',
+    color: '#eceff1',
+    desc: (v) => `Joker de valeur ${v} : rejoint votre plus grand groupe, dont le multiplicateur gagne +0,5.`,
+  },
   cleave: { icon: '🪓', name: 'Fendoir', color: '#ff7043', desc: (v) => `Inflige ${v} dégâts à tous les ennemis.` },
   rebirth: { icon: '💖', name: 'Renaissance', color: '#ff7eb6', desc: () => 'Rend tous vos PV, puis cette face devient ❌ Raté pour de bon.' },
   blank: { icon: '❌', name: 'Raté', color: '#555a66', desc: () => 'Ne fait rien.' },
@@ -49,6 +61,10 @@ export const SPELLS: Record<string, SpellDef> = {
   poisonBlade: { id: 'poisonBlade', name: 'Lame empoisonnée', icon: '🐍', cost: 2, desc: 'Inflige 4 dégâts et 4 Poison.' },
   smokeBomb: { id: 'smokeBomb', name: 'Fumigène', icon: '💨', cost: 2, desc: 'Gagne 8 armure, 1 Faiblesse à tous.' },
   execute: { id: 'execute', name: 'Exécution', icon: '🎯', cost: 3, desc: 'Inflige 2× le Poison de la cible.' },
+
+  boneRain: { id: 'boneRain', name: 'Pluie d’os', icon: '🦴', cost: 2, desc: 'Inflige 4 dégâts, +4 par 🦴 lancé ce tour.' },
+  boneArmor: { id: 'boneArmor', name: 'Armure d’os', icon: '🩻', cost: 2, desc: 'Gagne 5 armure, +3 par 🦴 lancé ce tour.' },
+  shatter: { id: 'shatter', name: 'Os brisés', icon: '💥', cost: 3, desc: 'Inflige 6 dégâts et 1 Vulnérable à tous.' },
 };
 
 // ---------- Classes ----------
@@ -78,7 +94,10 @@ export interface ClassDef {
 }
 
 /** Faces that only appear as rare rewards / starting bonuses. */
-export const RARE_KINDS: FaceKind[] = ['venom', 'cleave', 'rebirth'];
+export const RARE_KINDS: FaceKind[] = ['venom', 'cleave', 'rebirth', 'skull'];
+
+/** Faces that join another group in combos and copy its effect. */
+export const JOKER_KINDS: FaceKind[] = ['bone', 'skull'];
 
 /** Chance that one of the three combat rewards is replaced by a rare face. */
 export const RARE_CHANCE = { combat: 0.15, elite: 0.4 };
@@ -142,6 +161,24 @@ export const CLASSES: Record<ClassId, ClassDef> = {
     spells: ['poisonBlade', 'smokeBomb', 'execute'],
     facePool: [f('dagger', 4), f('dagger', 3), f('poison', 5), f('poison', 4), f('defend', 6), f('magic', 2), f('vamp', 4), f('heal', 4)],
     rarePool: [f('venom', 2)],
+  },
+  skeleton: {
+    id: 'skeleton',
+    name: 'Squelette',
+    emoji: '☠️',
+    tagline: 'Ses os comblent toujours les trous : les combos tombent tout seuls.',
+    maxHp: 60,
+    diceCount: 4,
+    rerolls: 2,
+    startMana: 0,
+    manaPerTurn: 0,
+    startStrength: 0,
+    poisonBonus: 0,
+    passive: 'Réassemblage : une fois par partie, quand il tombe à 0 PV, il se relève avec 30 % de ses PV max.',
+    die: [f('attack', 5), f('attack', 5), f('defend', 4), f('bone', 3), f('bone', 3), f('magic', 2)],
+    spells: ['boneRain', 'boneArmor', 'shatter'],
+    facePool: [f('attack', 8), f('attack', 7), f('defend', 7), f('bone', 4), f('bone', 5), f('magic', 3), f('vamp', 5), f('heal', 5)],
+    rarePool: [f('skull', 3)],
   },
 };
 

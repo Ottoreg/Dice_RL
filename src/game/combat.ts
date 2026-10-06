@@ -1,4 +1,4 @@
-import { CLASSES, COMBO_MULT, COMBO_NAMES, ENEMIES, FACE_INFO, SPELLS, hasValue } from './data';
+import { CLASSES, COMBO_MULT, COMBO_NAMES, ENEMIES, FACE_INFO, JOKER_KINDS, SPELLS, hasValue } from './data';
 import { randInt } from './rng';
 import type { AnimKind, CombatState, Combo, DieState, EnemyState, FaceKind, Fighter, FxEvent, Intent, RunState } from './types';
 
@@ -98,6 +98,16 @@ function checkEnd(s: CombatState) {
       log(s, `${e.emoji} ${e.name} est vaincu !`);
     }
   }
+  if (s.player.hp <= 0 && s.reviveAvailable) {
+    s.reviveAvailable = false;
+    s.revived = true;
+    s.player.hp = Math.ceil(s.player.maxHp * 0.3);
+    s.player.poison = 0;
+    anim(s, 'player', 'heal');
+    anim(s, 'player', 'rage');
+    fx(s, 'player', '☠️ Réassemblage !', 'heal');
+    log(s, `☠️ Réassemblage ! Vos os se recollent : vous revenez avec ${s.player.hp} PV.`);
+  }
   if (s.player.hp <= 0) {
     s.phase = 'lost';
     log(s, '☠️ Vous avez été vaincu…');
@@ -164,6 +174,8 @@ export function createCombat(run: RunState, enemyIds: string[]): CombatState {
     events: [],
     anims: [],
     vulnCarry: false,
+    reviveAvailable: run.classId === 'skeleton' && !run.reviveUsed,
+    revived: false,
   };
   return startPlayerTurn(s);
 }
@@ -234,39 +246,73 @@ export function reroll(prev: CombatState): CombatState {
 }
 
 /** Compute combos for the current dice (also used for the live preview). */
-export function computeCombos(s: CombatState): { combos: Combo[]; suite: boolean; mults: number[] } {
+export function computeCombos(s: CombatState): { combos: Combo[]; suite: boolean; mults: number[]; asKinds: (FaceKind | undefined)[] } {
+  const faces = s.dice.map((d) => d.faces[d.faceIdx]);
   const counts = new Map<FaceKind, number>();
-  for (const d of s.dice) {
-    const k = d.faces[d.faceIdx].kind;
-    if (k === 'blank') continue;
-    counts.set(k, (counts.get(k) ?? 0) + 1);
+  const totals = new Map<FaceKind, number>();
+  for (const f of faces) {
+    if (f.kind === 'blank' || JOKER_KINDS.includes(f.kind)) continue;
+    counts.set(f.kind, (counts.get(f.kind) ?? 0) + 1);
+    totals.set(f.kind, (totals.get(f.kind) ?? 0) + f.value);
   }
+  // Jokers (🦴) join the biggest group (ties: highest total value); alone they act as 🛡️.
+  const jokers = faces.filter((f) => JOKER_KINDS.includes(f.kind)).length;
+  let jokerKind: FaceKind | undefined;
+  if (jokers > 0) {
+    jokerKind = 'defend';
+    let best = -1;
+    for (const [k, c] of counts) {
+      const score = c * 1000 + (totals.get(k) ?? 0);
+      if (score > best) {
+        best = score;
+        jokerKind = k;
+      }
+    }
+    counts.set(jokerKind, (counts.get(jokerKind) ?? 0) + jokers);
+  }
+  const skullBonus = faces.some((f) => f.kind === 'skull') ? 0.5 : 0;
   const extra = s.relics.includes('hourglass') ? 0.25 : 0;
   const combos: Combo[] = [];
   for (const [kind, count] of counts) {
-    if (count >= 2) combos.push({ kind, count, mult: (COMBO_MULT[count] ?? 2.5) + extra, name: COMBO_NAMES[count] ?? 'YAM !' });
+    const bonus = kind === jokerKind ? skullBonus : 0;
+    if (count >= 2 || bonus > 0) {
+      combos.push({
+        kind,
+        count,
+        jokers: kind === jokerKind ? jokers : 0,
+        mult: (COMBO_MULT[count] ?? 2.5) + extra + bonus,
+        name: count >= 2 ? (COMBO_NAMES[count] ?? 'YAM !') : 'Crâne',
+      });
+    }
   }
   combos.sort((a, b) => b.count - a.count);
-  const suite = s.dice.length >= 4 && counts.size === s.dice.length;
-  const mults = s.dice.map((d) => {
-    const k = d.faces[d.faceIdx].kind;
+  const suite = s.dice.length >= 4 && jokers === 0 && counts.size === s.dice.length;
+  const asKinds = faces.map((f) => (JOKER_KINDS.includes(f.kind) ? jokerKind : undefined));
+  const mults = faces.map((f, i) => {
+    const k = asKinds[i] ?? f.kind;
     return combos.find((c) => c.kind === k)?.mult ?? 1;
   });
-  return { combos, suite, mults };
+  return { combos, suite, mults, asKinds };
+}
+
+/** "Brelan ⚔️ (+1🦴) ×1.5" */
+export function comboLabel(c: Combo): string {
+  return `${c.name} ${FACE_INFO[c.kind].icon}${c.jokers ? ` (+${c.jokers}🦴)` : ''} ×${c.mult}`;
 }
 
 export function confirmDice(prev: CombatState): CombatState {
   if (prev.phase !== 'rolling') return prev;
   const s = clone(prev);
-  const { combos, suite, mults } = computeCombos(s);
+  const { combos, suite, mults, asKinds } = computeCombos(s);
   s.combos = combos;
   s.suite = suite;
   s.dice.forEach((d, i) => {
     d.mult = mults[i];
+    d.asKind = asKinds[i];
     d.locked = false;
   });
   s.bonusText = [];
-  for (const c of combos) log(s, `🎲 ${c.name} de ${FACE_INFO[c.kind].icon} — ×${c.mult}`);
+  for (const c of combos) log(s, `🎲 ${comboLabel(c)}`);
   if (suite) {
     s.bonusText.push('Suite ! +2 à tous les dés');
     log(s, '🎲 Suite ! Toutes les faces sont différentes : +2 à chaque dé.');
@@ -292,8 +338,9 @@ export function confirmDice(prev: CombatState): CombatState {
 export function dieValue(s: CombatState, d: DieState, mult = d.mult): number {
   const face = d.faces[d.faceIdx];
   if (!hasValue(face.kind)) return 0;
+  const kind = d.asKind ?? face.kind;
   let base = face.value;
-  if (s.relics.includes('whetstone') && (face.kind === 'attack' || face.kind === 'dagger')) base += 1;
+  if (s.relics.includes('whetstone') && (kind === 'attack' || kind === 'dagger')) base += 1;
   if (s.suite) base += 2;
   return Math.round(base * mult);
 }
@@ -305,9 +352,11 @@ export function useDie(prev: CombatState, i: number): CombatState {
   d.used = true;
   const face = d.faces[d.faceIdx];
   const v = dieValue(s, d);
-  const info = FACE_INFO[face.kind];
+  // Jokers act as the face type they joined (alone, as a 🛡️).
+  const kind = JOKER_KINDS.includes(face.kind) ? (d.asKind ?? 'defend') : face.kind;
+  const info = FACE_INFO[kind];
   const target = getTarget(s);
-  switch (face.kind) {
+  switch (kind) {
     case 'attack':
       if (target) {
         anim(s, target.uid, 'slash');
@@ -424,6 +473,11 @@ export function useDie(prev: CombatState, i: number): CombatState {
   return s;
 }
 
+/** Number of 🦴 / 💀 faces showing on the dice this turn. */
+export function bonesRolled(s: CombatState): number {
+  return s.dice.filter((d) => JOKER_KINDS.includes(d.faces[d.faceIdx].kind)).length;
+}
+
 export function canCast(s: CombatState, spellId: string) {
   return s.phase === 'acting' && s.player.mana >= SPELLS[spellId].cost;
 }
@@ -493,6 +547,26 @@ export function castSpell(prev: CombatState, spellId: string): CombatState {
       for (const e of alive(s)) {
         anim(s, e.uid, 'smoke');
         e.weak += 1;
+      }
+      break;
+    case 'boneRain':
+      if (target) {
+        anim(s, target.uid, 'fire');
+        playerHits(s, target, 4 + 4 * bonesRolled(s));
+      }
+      break;
+    case 'boneArmor': {
+      const armor = 5 + 3 * bonesRolled(s);
+      anim(s, 'player', 'shield');
+      s.player.block += armor;
+      fx(s, 'player', `🛡️ +${armor}`, 'block');
+      break;
+    }
+    case 'shatter':
+      for (const e of alive(s)) {
+        anim(s, e.uid, 'slash');
+        playerHits(s, e, 6);
+        e.vulnerable += 1;
       }
       break;
     case 'execute':

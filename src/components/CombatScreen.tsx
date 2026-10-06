@@ -3,6 +3,7 @@ import {
   beginEnemyTurn,
   canCast,
   castSpell,
+  comboLabel,
   computeCombos,
   confirmDice,
   describeIntent,
@@ -27,7 +28,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 interface Props {
   initial: CombatState;
-  onEnd: (result: { won: boolean; hp: number; dice: Face[][] }) => void;
+  onEnd: (result: { won: boolean; hp: number; dice: Face[][]; revived: boolean }) => void;
 }
 
 export function CombatScreen({ initial, onEnd }: Props) {
@@ -166,12 +167,12 @@ export function CombatScreen({ initial, onEnd }: Props) {
       <div className="combo-banner">
         {s.phase === 'rolling' && !settling && preview && (preview.combos.length > 0 || preview.suite) && (
           <span className="preview">
-            Combos en vue : {preview.combos.map((c) => `${c.name} ${FACE_INFO[c.kind].icon} ×${c.mult}`).join(' · ')}
+            Combos en vue : {preview.combos.map(comboLabel).join(' · ')}
             {preview.suite && ' · Suite (+2)'}
           </span>
         )}
         {s.phase === 'acting' &&
-          [...s.combos.map((c) => `${c.name} ${FACE_INFO[c.kind].icon} ×${c.mult}`), ...s.bonusText].map((t) => (
+          [...s.combos.map(comboLabel), ...s.bonusText].map((t) => (
             <span key={t} className="combo-chip">
               {t}
             </span>
@@ -208,7 +209,9 @@ export function CombatScreen({ initial, onEnd }: Props) {
             rollId={s.rollId}
             locked={s.dice.map((d) => d.locked)}
             renderDie={(i) => {
-              const d = s.dice[i];
+              const raw = s.dice[i];
+              const d = preview ? { ...raw, asKind: preview.asKinds[i] } : raw;
+              const kind = d.asKind ?? d.faces[d.faceIdx].kind;
               return (
                 <Die
                   faces={d.faces}
@@ -220,8 +223,9 @@ export function CombatScreen({ initial, onEnd }: Props) {
                   mult={preview ? preview.mults[i] : d.mult}
                   value={
                     (preview ? dieValue({ ...s, suite: preview.suite }, d, preview.mults[i]) : dieValue(s, d)) +
-                    (DAMAGE_KINDS.includes(d.faces[d.faceIdx].kind) ? s.player.strength : 0)
+                    (DAMAGE_KINDS.includes(kind) ? s.player.strength : 0)
                   }
+                  joker={d.asKind ? FACE_INFO[d.asKind].icon : undefined}
                   combo={(preview ? preview.mults[i] : d.mult) > 1}
                   disabled={s.phase !== 'rolling' && s.phase !== 'acting'}
                   onClick={() => setS((x) => (x.phase === 'rolling' ? toggleLock(x, i) : useDie(x, i)))}
@@ -278,7 +282,7 @@ export function CombatScreen({ initial, onEnd }: Props) {
         <div className="overlay">
           <div className="modal">
             <h2>{s.phase === 'won' ? '🏆 Victoire !' : '☠️ Défaite'}</h2>
-            <button className="btn primary" onClick={() => onEnd({ won: s.phase === 'won', hp: s.player.hp, dice: s.dice.map((d) => d.faces) })}>
+            <button className="btn primary" onClick={() => onEnd({ won: s.phase === 'won', hp: s.player.hp, dice: s.dice.map((d) => d.faces), revived: s.revived })}>
               Continuer
             </button>
           </div>

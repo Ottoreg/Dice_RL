@@ -40,7 +40,7 @@ export default function App() {
     }
   };
 
-  const onCombatEnd = (node: MapNode, result: { won: boolean; hp: number; dice: Face[][] }) => {
+  const onCombatEnd = (node: MapNode, result: { won: boolean; hp: number; dice: Face[][]; revived: boolean }) => {
     if (!run) return;
     if (!result.won) {
       setRun({ ...run, hp: 0 });
@@ -50,7 +50,7 @@ export default function App() {
     let hp = result.hp;
     if (run.relics.includes('vampFang')) hp = Math.min(run.maxHp, hp + 6);
     // Faces can change during a fight (e.g. 💖 Renaissance turns into ❌).
-    const r = { ...run, hp, dice: result.dice };
+    const r = { ...run, hp, dice: result.dice, reviveUsed: run.reviveUsed || result.revived };
     setRun(r);
     if (node.type === 'boss') {
       setScreen({ kind: 'end', won: true });

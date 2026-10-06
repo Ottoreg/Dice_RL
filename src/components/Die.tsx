@@ -52,6 +52,8 @@ interface DieProps {
   mult: number;
   value: number;
   combo: boolean;
+  /** Icon of the face type a joker (🦴) copies this turn. */
+  joker?: string;
   onClick: () => void;
   disabled: boolean;
 }
@@ -83,7 +85,7 @@ function spinTo(prev: { x: number; y: number }, faceIdx: number) {
 }
 
 /** A combat die rendered as a 3D cube that tumbles whenever rollId changes (if not locked). */
-export function Die({ faces, faceIdx, rollId, rolling, locked, used, mult, value, combo, onClick, disabled }: DieProps) {
+export function Die({ faces, faceIdx, rollId, rolling, locked, used, mult, value, combo, joker, onClick, disabled }: DieProps) {
   const [rot, setRot] = useState(ORIENT[faceIdx % 6]);
   const [anim, setAnim] = useState(false);
 
@@ -130,6 +132,11 @@ export function Die({ faces, faceIdx, rollId, rolling, locked, used, mult, value
       </div>
       {mult > 1 && !anim && <span className="die-mult">×{mult}</span>}
       {locked && <span className="die-lock">🔒</span>}
+      {joker && !anim && (
+        <span className="die-joker" title="Joker : agit comme cette face">
+          ➜{joker}
+        </span>
+      )}
     </button>
   );
 }

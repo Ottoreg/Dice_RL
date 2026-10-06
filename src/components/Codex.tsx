@@ -86,6 +86,19 @@ const FACE_DETAILS: Record<FaceKind, { effect: string; notes: string[] }> = {
     effect: 'Inflige X dégâts à la cible et vous donne 1 mana.',
     notes: ['Version mage de l’Attaque. Ajoute votre Force.', 'Le mana gagné reste 1, quel que soit le combo.', 'Ne profite pas de la Pierre à aiguiser.'],
   },
+  bone: {
+    effect: 'Joker : rejoint votre plus grand groupe de faces pour former un combo, et agit comme ces faces avec sa propre valeur.',
+    notes: [
+      'Exemple : ⚔️5 ⚔️5 🦴3 🛡️4 donne un Brelan de ⚔️ : l’Os inflige 3 × 1,5 = 5 dégâts (+ Force).',
+      'En cas d’égalité, il rejoint le groupe dont les valeurs sont les plus hautes.',
+      'Sans autre face pour l’accueillir, il agit comme 🛡️ Défense.',
+      'Empêche la Suite. Face du Squelette.',
+    ],
+  },
+  skull: {
+    effect: 'Joker comme 🦴, et le groupe qu’il rejoint gagne +0,5 de multiplicateur.',
+    notes: ['Face rare du Squelette, obtenue uniquement en récompense.', 'Même seul avec une autre face, il donne un bonus ×1,5 au groupe.'],
+  },
   cleave: {
     effect: 'Inflige X dégâts à tous les ennemis, comme le sort Tourbillon.',
     notes: ['Face rare du Guerrier, obtenue uniquement en récompense.', 'Ajoute votre Force à chaque ennemi touché.', 'Ne forme pas de combo avec 🔥 Feu.'],
@@ -102,7 +115,7 @@ const FACE_DETAILS: Record<FaceKind, { effect: string; notes: string[] }> = {
   blank: { effect: 'Ne fait rien.', notes: ['Ne compte pas dans les combos et empêche la Suite.', 'Au feu de camp, la Forge la transforme en 🛡️3.'] },
 };
 
-const FACE_ORDER: FaceKind[] = ['attack', 'staff', 'dagger', 'cleave', 'fire', 'frost', 'vamp', 'poison', 'venom', 'defend', 'heal', 'rebirth', 'magic', 'rage', 'blank'];
+const FACE_ORDER: FaceKind[] = ['attack', 'staff', 'dagger', 'cleave', 'fire', 'frost', 'vamp', 'poison', 'venom', 'defend', 'heal', 'rebirth', 'magic', 'rage', 'bone', 'skull', 'blank'];
 
 function whereFound(kind: FaceKind): string[] {
   const out: string[] = [];
@@ -166,6 +179,7 @@ function RulesTab() {
       <h3>Combos (faces de même type)</h3>
       <p className="codex-intro">
         Seul le <b>type</b> de face compte : ⚔️6 et ⚔️9 forment une paire. Le multiplicateur s’applique à chaque dé du groupe.
+        Les faces 🦴 Os (Squelette) sont des jokers : elles rejoignent votre plus grand groupe.
       </p>
       <table className="codex-table">
         <thead>
@@ -229,6 +243,7 @@ function RulesTab() {
         <li>
           <b>Face rare</b> : après un combat, une des 3 faces proposées peut être remplacée par une face rare de votre classe (15 % de chance,
           40 % contre une élite). Guerrier : 🪓 Fendoir. Mage : 💖 Renaissance. Voleur : ☣️ Venin (qu’il a aussi sur son premier dé au départ).
+          Squelette : 💀 Crâne hurlant.
         </li>
         <li>
           <b>Élite</b> : récompense de face + une relique.
