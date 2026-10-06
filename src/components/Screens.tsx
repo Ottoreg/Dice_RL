@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { CLASSES, FACE_INFO, RELICS, SPELLS } from '../game/data';
 import { FLOORS, isReachable } from '../game/run';
 import type { ClassId, Face, MapNode, NodeType, RunState } from '../game/types';
+import { Codex, DiceModal } from './Codex';
 import { FaceView } from './Die';
 
 // ---------- Shared ----------
@@ -51,8 +52,11 @@ export function RelicBar({ relics }: { relics: string[] }) {
 
 export function TopBar({ run, hideHp }: { run: RunState; hideHp?: boolean }) {
   const cls = CLASSES[run.classId];
+  const [open, setOpen] = useState<'dice' | 'codex' | null>(null);
   return (
     <div className="topbar">
+      {open === 'dice' && <DiceModal dice={run.dice} onClose={() => setOpen(null)} />}
+      {open === 'codex' && <Codex onClose={() => setOpen(null)} />}
       <span className="tb-class">
         {cls.emoji} {cls.name}
       </span>
@@ -65,6 +69,14 @@ export function TopBar({ run, hideHp }: { run: RunState; hideHp?: boolean }) {
         🏰 Étage {Math.max(0, run.floor + 1)} / {FLOORS}
       </span>
       <RelicBar relics={run.relics} />
+      <div className="tb-buttons">
+        <button className="btn small" onClick={() => setOpen('dice')}>
+          🎲 Mes dés
+        </button>
+        <button className="btn small" onClick={() => setOpen('codex')}>
+          📖 Codex
+        </button>
+      </div>
     </div>
   );
 }
@@ -72,14 +84,21 @@ export function TopBar({ run, hideHp }: { run: RunState; hideHp?: boolean }) {
 // ---------- Title ----------
 
 export function TitleScreen({ onStart }: { onStart: () => void }) {
+  const [codex, setCodex] = useState(false);
   return (
     <div className="screen title-screen">
       <div className="title-dice">🎲⚔️🎲</div>
       <h1>Dice Dungeon</h1>
       <p className="subtitle">Un roguelike tour par tour où chaque action se joue aux dés.</p>
-      <button className="btn primary big" onClick={onStart}>
-        Nouvelle partie
-      </button>
+      <div className="title-buttons">
+        <button className="btn primary big" onClick={onStart}>
+          Nouvelle partie
+        </button>
+        <button className="btn big" onClick={() => setCodex(true)}>
+          📖 Codex
+        </button>
+      </div>
+      {codex && <Codex onClose={() => setCodex(false)} />}
       <div className="how-to">
         <h3>Comment jouer</h3>
         <ul>
@@ -149,7 +168,6 @@ const NODE_INFO: Record<NodeType, { icon: string; name: string }> = {
 };
 
 export function MapScreen({ run, onPick }: { run: RunState; onPick: (n: MapNode) => void }) {
-  const [showDice, setShowDice] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -212,10 +230,8 @@ export function MapScreen({ run, onPick }: { run: RunState; onPick: (n: MapNode)
               </div>
             ))}
           </div>
-          <button className="btn" onClick={() => setShowDice((x) => !x)}>
-            {showDice ? 'Masquer mes dés' : '🎲 Voir mes dés'}
-          </button>
-          {showDice && <DiceInventory dice={run.dice} />}
+          <h3>Vos dés</h3>
+          <DiceInventory dice={run.dice} />
         </div>
       </div>
     </div>

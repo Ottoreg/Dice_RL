@@ -75,6 +75,31 @@ export interface FxEvent {
   tone: 'dmg' | 'block' | 'heal' | 'buff' | 'debuff' | 'mana';
 }
 
+export type AnimKind =
+  | 'slash'
+  | 'dagger'
+  | 'fire'
+  | 'frost'
+  | 'shield'
+  | 'magic'
+  | 'heal'
+  | 'poison'
+  | 'rage'
+  | 'vamp'
+  | 'blank'
+  | 'whirlwind'
+  | 'ice'
+  | 'smoke'
+  | 'execute'
+  | 'curse'
+  | 'lunge';
+
+export interface AnimEvent {
+  id: number;
+  target: 'player' | number;
+  kind: AnimKind;
+}
+
 export interface CombatState {
   classId: ClassId;
   relics: string[];
@@ -92,6 +117,9 @@ export interface CombatState {
   suite: boolean;
   log: string[];
   events: FxEvent[];
+  anims: AnimEvent[];
+  /** Whether the player was already Vulnerable when the current enemy turn began. */
+  vulnCarry: boolean;
 }
 
 export type NodeType = 'combat' | 'elite' | 'rest' | 'treasure' | 'boss';

@@ -16,8 +16,9 @@ import {
   useDie,
 } from '../game/combat';
 import { CLASSES, FACE_INFO, SPELLS } from '../game/data';
-import type { CombatState, Fighter, FxEvent } from '../game/types';
-import { Die } from './Die';
+import type { AnimEvent, CombatState, Fighter, FxEvent } from '../game/types';
+import { Die, ROLL_MS } from './Die';
+import { EffectLayer } from './Fx';
 
 const DAMAGE_KINDS = ['attack', 'dagger', 'fire', 'frost', 'vamp'];
 
@@ -32,6 +33,8 @@ export function CombatScreen({ initial, onEnd }: Props) {
   const [s, setS] = useState(initial);
   const [floaters, setFloaters] = useState<FxEvent[]>([]);
   const [shake, setShake] = useState<'player' | number | null>(null);
+  const [anims, setAnims] = useState<AnimEvent[]>([]);
+  const [settling, setSettling] = useState(false);
   const mounted = useRef(true);
   const busy = useRef(false);
   const cls = CLASSES[s.classId];
@@ -57,6 +60,25 @@ export function CombatScreen({ initial, onEnd }: Props) {
     const t = setTimeout(() => mounted.current && setFloaters((f) => f.filter((x) => !ids.has(x.id))), 1100);
     return () => clearTimeout(t);
   }, [s.events]);
+
+  // Effect animations from engine events.
+  useEffect(() => {
+    if (s.anims.length === 0) return;
+    const evs = s.anims;
+    setAnims((a) => [...a, ...evs]);
+    const ids = new Set(evs.map((e) => e.id));
+    const t = setTimeout(() => mounted.current && setAnims((a) => a.filter((x) => !ids.has(x.id))), 1000);
+    return () => clearTimeout(t);
+  }, [s.anims]);
+
+  // Hide combo info while the dice are still tumbling.
+  useEffect(() => {
+    setSettling(true);
+    const t = setTimeout(() => mounted.current && setSettling(false), ROLL_MS);
+    return () => clearTimeout(t);
+  }, [s.rollId]);
+
+  const animsFor = (target: 'player' | number) => anims.filter((a) => a.target === target);
 
   const runEnemyTurn = useCallback(async () => {
     if (busy.current) return;
@@ -116,7 +138,9 @@ export function CombatScreen({ initial, onEnd }: Props) {
           return (
             <div
               key={e.uid}
-              className={`enemy ${dead ? 'dead' : ''} ${s.target === e.uid && !dead ? 'targeted' : ''} ${shake === e.uid ? 'shake' : ''}`}
+              className={`enemy ${dead ? 'dead' : ''} ${s.target === e.uid && !dead ? 'targeted' : ''} ${shake === e.uid ? 'shake' : ''} ${
+                animsFor(e.uid).some((a) => a.kind === 'lunge') ? 'lunge' : ''
+              }`}
               onClick={() => setS((x) => setTarget(x, e.uid))}
             >
               {!dead && (
@@ -129,6 +153,7 @@ export function CombatScreen({ initial, onEnd }: Props) {
               <div className="enemy-name">{e.name}</div>
               <HpBar f={e} />
               <Statuses f={e} frozen={e.frozen} />
+              <EffectLayer anims={animsFor(e.uid)} />
               <div className="floaters">{floatersFor(e.uid)}</div>
               {s.target === e.uid && !dead && <div className="target-marker">🎯</div>}
             </div>
@@ -137,7 +162,7 @@ export function CombatScreen({ initial, onEnd }: Props) {
       </div>
 
       <div className="combo-banner">
-        {s.phase === 'rolling' && preview && (preview.combos.length > 0 || preview.suite) && (
+        {s.phase === 'rolling' && !settling && preview && (preview.combos.length > 0 || preview.suite) && (
           <span className="preview">
             Combos en vue :{' '}
             {preview.combos.map((c) => `${c.name} ${FACE_INFO[c.kind].icon} ×${c.mult}`).join(' · ')}
@@ -162,6 +187,7 @@ export function CombatScreen({ initial, onEnd }: Props) {
             <Statuses f={s.player} />
             <div className="mana">✨ Mana : <b>{s.player.mana}</b></div>
           </div>
+          <EffectLayer anims={animsFor('player')} />
           <div className="floaters">{floatersFor('player')}</div>
         </div>
 

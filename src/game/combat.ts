@@ -1,16 +1,20 @@
 import { CLASSES, COMBO_MULT, COMBO_NAMES, ENEMIES, FACE_INFO, SPELLS } from './data';
 import { randInt } from './rng';
-import type { CombatState, Combo, DieState, EnemyState, FaceKind, Fighter, FxEvent, Intent, RunState } from './types';
+import type { AnimKind, CombatState, Combo, DieState, EnemyState, FaceKind, Fighter, FxEvent, Intent, RunState } from './types';
 
 let fxCounter = 0;
 let uidCounter = 0;
 
 type Target = 'player' | number;
 
-const clone = (s: CombatState): CombatState => ({ ...structuredClone(s), events: [] });
+const clone = (s: CombatState): CombatState => ({ ...structuredClone(s), events: [], anims: [] });
 
 function fx(s: CombatState, target: Target, text: string, tone: FxEvent['tone']) {
   s.events.push({ id: ++fxCounter, target, text, tone });
+}
+
+function anim(s: CombatState, target: Target, kind: AnimKind) {
+  s.anims.push({ id: ++fxCounter, target, kind });
 }
 
 function log(s: CombatState, line: string) {
@@ -155,6 +159,8 @@ export function createCombat(run: RunState, enemyIds: string[]): CombatState {
     suite: false,
     log: [`Combat contre ${enemies.map((e) => `${e.emoji} ${e.name}`).join(', ')} !`],
     events: [],
+    anims: [],
+    vulnCarry: false,
   };
   return startPlayerTurn(s);
 }
@@ -170,11 +176,17 @@ export function startPlayerTurn(prev: CombatState): CombatState {
   if (s.phase === 'won' || s.phase === 'lost') return s;
   s.turn += 1;
   s.player.block = 0;
+  // Vulnerable on the player counts enemy turns; stacks applied during the
+  // enemy turn that just ended only start counting down from the next one.
+  if (s.vulnCarry && s.player.vulnerable > 0) s.player.vulnerable -= 1;
+  s.vulnCarry = false;
   if (s.turn === 1 && s.relics.includes('ancestralShield')) {
     s.player.block += 8;
     fx(s, 'player', '🛡️ +8', 'block');
+    anim(s, 'player', 'shield');
   }
   if (s.player.poison > 0) {
+    anim(s, 'player', 'poison');
     log(s, `🧪 Le poison vous inflige ${s.player.poison} dégâts.`);
     hurt(s, s.player, 'player', s.player.poison, true);
     s.player.poison -= 1;
@@ -261,11 +273,13 @@ export function confirmDice(prev: CombatState): CombatState {
     s.player.block += 6;
     s.bonusText.push('Full ! +6 armure');
     fx(s, 'player', '🛡️ +6', 'block');
+    anim(s, 'player', 'shield');
     log(s, '🎲 Full ! Vous gagnez 6 armure.');
   } else if (counts[0] === 2 && counts[1] === 2) {
     s.player.block += 3;
     s.bonusText.push('Double paire ! +3 armure');
     fx(s, 'player', '🛡️ +3', 'block');
+    anim(s, 'player', 'shield');
     log(s, '🎲 Double paire ! Vous gagnez 3 armure.');
   }
   s.phase = 'acting';
@@ -293,23 +307,29 @@ export function useDie(prev: CombatState, i: number): CombatState {
   switch (face.kind) {
     case 'attack':
       if (target) {
+        anim(s, target.uid, 'slash');
         playerHits(s, target, v);
         log(s, `${info.icon} Vous attaquez ${target.name}.`);
       }
       break;
     case 'dagger':
       if (target) {
+        anim(s, target.uid, 'dagger');
         playerHits(s, target, v);
         if (target.hp > 0) playerHits(s, target, v);
         log(s, `${info.icon} Double coup de dague sur ${target.name}.`);
       }
       break;
     case 'fire':
-      for (const e of alive(s)) playerHits(s, e, v);
+      for (const e of alive(s)) {
+        anim(s, e.uid, 'fire');
+        playerHits(s, e, v);
+      }
       log(s, `${info.icon} Les flammes frappent tous les ennemis.`);
       break;
     case 'frost':
       if (target) {
+        anim(s, target.uid, 'frost');
         playerHits(s, target, v);
         target.weak += 1;
         fx(s, target.uid, '❄️ Faible', 'debuff');
@@ -317,39 +337,49 @@ export function useDie(prev: CombatState, i: number): CombatState {
       }
       break;
     case 'defend':
+      anim(s, 'player', 'shield');
       s.player.block += v;
       fx(s, 'player', `🛡️ +${v}`, 'block');
       log(s, `${info.icon} Vous gagnez ${v} armure.`);
       break;
     case 'magic':
+      anim(s, 'player', 'magic');
       s.player.mana += v;
       fx(s, 'player', `✨ +${v}`, 'mana');
       log(s, `${info.icon} Vous gagnez ${v} mana.`);
       break;
     case 'heal':
+      anim(s, 'player', 'heal');
       heal(s, s.player, 'player', v);
       log(s, `${info.icon} Vous vous soignez de ${v}.`);
       break;
     case 'poison':
       if (target) {
+        anim(s, target.uid, 'poison');
         applyPoison(s, target, v);
         log(s, `${info.icon} Vous empoisonnez ${target.name}.`);
       }
       break;
     case 'rage':
+      anim(s, 'player', 'rage');
       s.player.strength += v;
       fx(s, 'player', `💪 +${v}`, 'buff');
       log(s, `${info.icon} Vous gagnez ${v} Force.`);
       break;
     case 'vamp':
       if (target) {
+        anim(s, target.uid, 'vamp');
         const lost = playerHits(s, target, v);
         const h = Math.ceil(lost / 2);
-        if (h > 0) heal(s, s.player, 'player', h);
+        if (h > 0) {
+          anim(s, 'player', 'heal');
+          heal(s, s.player, 'player', h);
+        }
         log(s, `${info.icon} Vous drainez ${target.name}.`);
       }
       break;
     case 'blank':
+      anim(s, 'player', 'blank');
       log(s, `${info.icon} Raté…`);
       break;
   }
@@ -370,36 +400,51 @@ export function castSpell(prev: CombatState, spellId: string): CombatState {
   log(s, `${spell.icon} Vous lancez ${spell.name} !`);
   switch (spellId) {
     case 'heroicStrike':
-      if (target) playerHits(s, target, 12);
+      if (target) {
+        anim(s, target.uid, 'slash');
+        playerHits(s, target, 12);
+      }
       break;
     case 'warCry':
+      anim(s, 'player', 'rage');
       s.player.strength += 2;
       fx(s, 'player', '💪 +2', 'buff');
       break;
     case 'whirlwind':
-      for (const e of alive(s)) playerHits(s, e, 7);
+      for (const e of alive(s)) {
+        anim(s, e.uid, 'whirlwind');
+        playerHits(s, e, 7);
+      }
       break;
     case 'fireball':
-      if (target) playerHits(s, target, 15);
+      if (target) {
+        anim(s, target.uid, 'fire');
+        playerHits(s, target, 15);
+      }
       break;
     case 'frostNova':
       for (const e of alive(s)) {
+        anim(s, e.uid, 'frost');
         playerHits(s, e, 5);
         e.weak += 1;
       }
       break;
     case 'arcaneBarrier':
+      anim(s, 'player', 'shield');
       s.player.block += 10;
       fx(s, 'player', '🛡️ +10', 'block');
       break;
     case 'icePrison':
       if (target) {
+        anim(s, target.uid, 'ice');
         target.frozen = true;
         fx(s, target.uid, '🧊 Gelé', 'debuff');
       }
       break;
     case 'poisonBlade':
       if (target) {
+        anim(s, target.uid, 'dagger');
+        anim(s, target.uid, 'poison');
         playerHits(s, target, 4);
         if (target.hp > 0) applyPoison(s, target, 4);
       }
@@ -407,10 +452,17 @@ export function castSpell(prev: CombatState, spellId: string): CombatState {
     case 'smokeBomb':
       s.player.block += 8;
       fx(s, 'player', '🛡️ +8', 'block');
-      for (const e of alive(s)) e.weak += 1;
+      anim(s, 'player', 'shield');
+      for (const e of alive(s)) {
+        anim(s, e.uid, 'smoke');
+        e.weak += 1;
+      }
       break;
     case 'execute':
-      if (target) playerHits(s, target, target.poison * 2);
+      if (target) {
+        anim(s, target.uid, 'execute');
+        playerHits(s, target, target.poison * 2);
+      }
       break;
   }
   checkEnd(s);
@@ -420,14 +472,13 @@ export function castSpell(prev: CombatState, spellId: string): CombatState {
 export function setTarget(prev: CombatState, uid: number): CombatState {
   const e = prev.enemies.find((x) => x.uid === uid);
   if (!e || e.hp <= 0) return prev;
-  return { ...prev, target: uid, events: [] };
+  return { ...prev, target: uid, events: [], anims: [] };
 }
 
 export function endPlayerTurn(prev: CombatState): CombatState {
   if (prev.phase !== 'acting' && prev.phase !== 'rolling') return prev;
   const s = clone(prev);
   if (s.player.weak > 0) s.player.weak -= 1;
-  if (s.player.vulnerable > 0) s.player.vulnerable -= 1;
   s.phase = 'enemy';
   return s;
 }
@@ -437,9 +488,11 @@ export function endPlayerTurn(prev: CombatState): CombatState {
 export function beginEnemyTurn(prev: CombatState): CombatState {
   if (prev.phase !== 'enemy') return prev;
   const s = clone(prev);
+  s.vulnCarry = s.player.vulnerable > 0;
   for (const e of alive(s)) {
     e.block = 0;
     if (e.poison > 0) {
+      anim(s, e.uid, 'poison');
       log(s, `🧪 ${e.name} subit ${e.poison} dégâts de poison.`);
       hurt(s, e, e.uid, e.poison, true);
       e.poison -= 1;
@@ -461,25 +514,34 @@ export function enemyAct(prev: CombatState, idx: number): CombatState {
     e.frozen = false;
     log(s, `🧊 ${e.name} est gelé et passe son tour.`);
     fx(s, e.uid, '🧊 Gelé', 'debuff');
+    anim(s, e.uid, 'ice');
   } else {
     const m = currentIntent(e);
     if (m.label) log(s, `${e.emoji} ${e.name} : ${m.label}`);
-    if (m.heal) heal(s, e, e.uid, m.heal);
+    if (m.heal) {
+      anim(s, e.uid, 'heal');
+      heal(s, e, e.uid, m.heal);
+    }
     if (m.block) {
+      anim(s, e.uid, 'shield');
       e.block += m.block;
       fx(s, e.uid, `🛡️ +${m.block}`, 'block');
     }
     if (m.str) {
+      anim(s, e.uid, 'rage');
       e.strength += m.str;
       fx(s, e.uid, `💪 +${m.str}`, 'buff');
     }
     if (m.dmg !== undefined) {
       const times = m.times ?? 1;
+      anim(s, e.uid, 'lunge');
+      anim(s, 'player', times > 1 ? 'dagger' : 'slash');
       for (let t = 0; t < times && p.hp > 0; t++) {
         hurt(s, p, 'player', attackDamage(e, p, m.dmg));
       }
       log(s, `${e.emoji} ${e.name} attaque${times > 1 ? ` ${times} fois` : ''} (${attackDamage(e, p, m.dmg)}).`);
     }
+    if (m.weak || m.vuln) anim(s, 'player', 'curse');
     if (m.weak) {
       p.weak += m.weak;
       fx(s, 'player', `Faible +${m.weak}`, 'debuff');
@@ -489,6 +551,7 @@ export function enemyAct(prev: CombatState, idx: number): CombatState {
       fx(s, 'player', `Vulnérable +${m.vuln}`, 'debuff');
     }
     if (m.poison) {
+      anim(s, 'player', 'poison');
       p.poison += m.poison;
       fx(s, 'player', `🧪 +${m.poison}`, 'debuff');
     }

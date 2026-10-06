@@ -1,0 +1,448 @@
+import { useEffect, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
+import { CLASSES, COMBO_MULT, COMBO_NAMES, ENCOUNTERS, ENEMIES, FACE_INFO, RELICS, SPELLS } from '../game/data';
+import type { Face, FaceKind, Intent } from '../game/types';
+import { FaceView } from './Die';
+
+export function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+  return createPortal(
+    <div className="overlay" onClick={onClose}>
+      <div className="modal big-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-head">
+          <h2>{title}</h2>
+          <button className="btn close" onClick={onClose} aria-label="Fermer">
+            ✕
+          </button>
+        </div>
+        <div className="modal-body">{children}</div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+// ---------- Faces ----------
+
+const FACE_DETAILS: Record<FaceKind, { effect: string; notes: string[] }> = {
+  attack: {
+    effect: 'Inflige X dégâts à la cible 🎯.',
+    notes: ['Ajoute votre Force.', 'L’armure de la cible absorbe les dégâts en premier.', 'Bonus de la Pierre à aiguiser : +1.'],
+  },
+  dagger: {
+    effect: 'Inflige X dégâts deux fois à la cible.',
+    notes: [
+      'La Force s’ajoute à chaque coup : elle compte double.',
+      'L’armure absorbe chaque coup séparément. Le second coup est annulé si la cible meurt.',
+      'Bonus de la Pierre à aiguiser : +1 sur chaque coup.',
+    ],
+  },
+  fire: {
+    effect: 'Inflige X dégâts à tous les ennemis.',
+    notes: ['Ajoute votre Force à chaque ennemi touché.', 'Idéal contre les groupes.'],
+  },
+  frost: {
+    effect: 'Inflige X dégâts à la cible et lui applique 1 Faiblesse.',
+    notes: ['Ajoute votre Force.', 'La Faiblesse appliquée reste 1, quel que soit le combo.'],
+  },
+  defend: {
+    effect: 'Vous gagnez X armure.',
+    notes: ['L’armure absorbe les dégâts avant vos PV.', 'Elle disparaît au début de votre tour suivant.', 'Le poison ignore l’armure.'],
+  },
+  magic: {
+    effect: 'Vous gagnez X mana.',
+    notes: ['Le mana sert à lancer les sorts de votre classe.', 'Il se garde d’un tour à l’autre, mais repart de la valeur de départ de la classe à chaque combat.'],
+  },
+  heal: { effect: 'Vous récupérez X PV.', notes: ['Ne dépasse pas vos PV max.'] },
+  poison: {
+    effect: 'Applique X Poison à la cible.',
+    notes: ['+1 avec le passif du Voleur, +2 avec la Fiole toxique.', 'Voir l’onglet États pour le fonctionnement détaillé.'],
+  },
+  rage: {
+    effect: 'Vous gagnez X Force jusqu’à la fin du combat.',
+    notes: [
+      'Utilisez-la avant vos attaques pour qu’elles en profitent.',
+      'La valeur est arrondie : 1 × 1,25 (Paire) donne toujours 1, mais 1 × 1,5 (Brelan) donne 2.',
+    ],
+  },
+  vamp: {
+    effect: 'Inflige X dégâts à la cible et vous soigne de la moitié des PV qu’elle perd.',
+    notes: ['Ajoute votre Force.', 'Les dégâts absorbés par l’armure ne soignent pas. Le soin est arrondi au supérieur.'],
+  },
+  blank: { effect: 'Ne fait rien.', notes: ['Ne compte pas dans les combos et empêche la Suite.', 'Au feu de camp, la Forge la transforme en 🛡️3.'] },
+};
+
+const FACE_ORDER: FaceKind[] = ['attack', 'dagger', 'fire', 'frost', 'vamp', 'poison', 'defend', 'heal', 'magic', 'rage', 'blank'];
+
+function whereFound(kind: FaceKind): string[] {
+  const out: string[] = [];
+  for (const c of Object.values(CLASSES)) {
+    const start = c.die.filter((f) => f.kind === kind).map((f) => f.value);
+    const pool = c.facePool.filter((f) => f.kind === kind).map((f) => f.value);
+    if (start.length) out.push(`${c.emoji} ${c.name}, dé de départ : ${start.join(', ')}`);
+    if (pool.length) out.push(`${c.emoji} ${c.name}, récompenses : ${pool.join(', ')}`);
+  }
+  return out;
+}
+
+function FacesTab() {
+  return (
+    <div className="codex-list">
+      <p className="codex-intro">
+        Valeur d’un dé = arrondi((valeur de la face + bonus) × multiplicateur de combo). Les faces de dégâts ajoutent ensuite votre <b>Force</b>.
+        Les dégâts sont réduits de 25 % si vous êtes <b>Faible</b> et augmentés de 50 % si la cible est <b>Vulnérable</b>.
+      </p>
+      {FACE_ORDER.map((k) => {
+        const info = FACE_INFO[k];
+        const d = FACE_DETAILS[k];
+        return (
+          <div key={k} className="codex-entry">
+            <FaceView face={{ kind: k, value: 0 }} size="lg" label="X" />
+            <div>
+              <h4>{info.name}</h4>
+              <p>{d.effect}</p>
+              <ul>
+                {d.notes.map((n) => (
+                  <li key={n}>{n}</li>
+                ))}
+              </ul>
+              <div className="codex-where">{whereFound(k).join(' · ') || 'Aucune source pour le moment.'}</div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ---------- Rules & combos ----------
+
+function RulesTab() {
+  return (
+    <div className="codex-list">
+      <h3>Déroulement d’un tour</h3>
+      <ol>
+        <li>Vos dés sont lancés automatiquement.</li>
+        <li>Cliquez sur un dé pour le garder 🔒, puis relancez les autres. Vous avez 2 relances par tour (+1 avec le Dé pipé).</li>
+        <li>Validez : les combos sont calculés une fois pour toutes, puis vous utilisez vos dés dans l’ordre de votre choix.</li>
+        <li>Lancez des sorts avec votre mana. Les dés non utilisés sont perdus à la fin du tour.</li>
+        <li>Les ennemis exécutent l’intention affichée au-dessus d’eux.</li>
+      </ol>
+      <h3>Combos (faces de même type)</h3>
+      <p className="codex-intro">
+        Seul le <b>type</b> de face compte : ⚔️6 et ⚔️9 forment une paire. Le multiplicateur s’applique à chaque dé du groupe.
+      </p>
+      <table className="codex-table">
+        <thead>
+          <tr>
+            <th>Dés identiques</th>
+            <th>Nom</th>
+            <th>Multiplicateur</th>
+            <th>Total (dés × mult.)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {[2, 3, 4, 5, 6].map((n) => (
+            <tr key={n}>
+              <td>{n}</td>
+              <td>{COMBO_NAMES[n]}</td>
+              <td>×{COMBO_MULT[n]}</td>
+              <td>{(n * COMBO_MULT[n]).toFixed(2).replace(/\.?0+$/, '')} fois la valeur d’un dé</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <h3>Bonus de figure</h3>
+      <table className="codex-table">
+        <tbody>
+          <tr>
+            <td>
+              <b>Full</b>
+            </td>
+            <td>Un Brelan et une Paire (5 dés minimum) : +6 armure immédiatement.</td>
+          </tr>
+          <tr>
+            <td>
+              <b>Double paire</b>
+            </td>
+            <td>Deux Paires : +3 armure immédiatement.</td>
+          </tr>
+          <tr>
+            <td>
+              <b>Suite</b>
+            </td>
+            <td>Tous les dés ont un type différent, sans ❌ (4 dés minimum) : +2 à la valeur de chaque dé.</td>
+          </tr>
+          <tr>
+            <td>
+              <b>Sablier</b>
+            </td>
+            <td>La relique ajoute +0,25 à tous les multiplicateurs de combo.</td>
+          </tr>
+        </tbody>
+      </table>
+      <h3>Progression</h3>
+      <ul>
+        <li>
+          <b>Combat</b> : choisissez une face parmi 3 (tirées des récompenses de votre classe) et remplacez la face de votre choix. À partir de
+          l’étage 6, les faces proposées gagnent +1 (+2 dès l’étage 11), sauf ✨ et 💢.
+        </li>
+        <li>
+          <b>Élite</b> : récompense de face + une relique.
+        </li>
+        <li>
+          <b>Trésor</b> : choisissez 1 relique parmi 3.
+        </li>
+        <li>
+          <b>Feu de camp</b> : soignez 30 % de vos PV max, ou forgez une face (+2, ou +1 pour ✨ et 💢, et ❌ devient 🛡️3).
+        </li>
+        <li>
+          Les ennemis normaux gagnent +2 % de PV par étage. Le Dragon ancien attend au 12e étage.
+        </li>
+      </ul>
+    </div>
+  );
+}
+
+// ---------- States ----------
+
+const STATES: { icon: string; name: string; text: string }[] = [
+  { icon: '🛡️', name: 'Armure', text: 'Absorbe les dégâts avant les PV. Celle du joueur disparaît au début de son tour, celle des ennemis au début du leur. Le poison l’ignore.' },
+  { icon: '💪', name: 'Force', text: 'Ajoute +1 dégât par point à chaque coup porté (attaque, dague, feu, givre, drain, sorts de dégâts). Dure tout le combat.' },
+  {
+    icon: '🥀',
+    name: 'Faiblesse',
+    text: 'Les coups portés font 25 % de dégâts en moins. Perd 1 point à la fin de chaque tour de celui qui la subit : appliquée à un ennemi pendant votre tour, elle affaiblit sa prochaine attaque.',
+  },
+  {
+    icon: '💔',
+    name: 'Vulnérable',
+    text: 'Les dégâts reçus sont augmentés de 50 %. Sur le joueur, chaque point dure un tour ennemi complet, en commençant par le tour ennemi suivant.',
+  },
+  {
+    icon: '🧪',
+    name: 'Poison',
+    text: 'Au début de son tour, la victime perd autant de PV que son Poison (l’armure ne protège pas), puis le Poison baisse de 1. Les applications s’additionnent. Une pile de N inflige au total N + (N−1) + … + 1 dégâts si on ne la recharge pas.',
+  },
+  { icon: '🧊', name: 'Gel', text: 'La cible passe sa prochaine action, qui est perdue. Au tour suivant, elle enchaîne sur son action suivante.' },
+];
+
+function StatesTab() {
+  return (
+    <div className="codex-list">
+      {STATES.map((st) => (
+        <div key={st.name} className="codex-entry">
+          <span className="codex-big">{st.icon}</span>
+          <div>
+            <h4>{st.name}</h4>
+            <p>{st.text}</p>
+          </div>
+        </div>
+      ))}
+      <h3>Exemple de poison</h3>
+      <p className="codex-intro">
+        5 Poison sur un ennemi : 5 dégâts au début de son tour, puis 4, 3, 2 et 1, soit 15 dégâts en tout. Si vous en rajoutez 3 alors qu’il en reste 4,
+        la pile monte à 7. L’<b>Exécution</b> du Voleur inflige 2 × le Poison actuel, sans consommer la pile.
+      </p>
+    </div>
+  );
+}
+
+// ---------- Classes & spells ----------
+
+function ClassesTab() {
+  return (
+    <div className="codex-list">
+      <p className="codex-intro">
+        Les sorts de dégâts profitent de la Force, de la Faiblesse et de la Vulnérabilité, mais pas des combos.
+      </p>
+      {Object.values(CLASSES).map((c) => (
+        <div key={c.id} className="codex-class">
+          <h3>
+            {c.emoji} {c.name}
+          </h3>
+          <div className="class-stats">
+            <span>❤️ {c.maxHp} PV</span>
+            <span>🎲 {c.diceCount} dés</span>
+            <span>🔄 {c.rerolls} relances</span>
+            <span>✨ {c.startMana} au départ</span>
+          </div>
+          <p className="passive">{c.passive}</p>
+          <div className="inv-faces">
+            {c.die.map((f, i) => (
+              <FaceView key={i} face={f} />
+            ))}
+          </div>
+          <table className="codex-table">
+            <thead>
+              <tr>
+                <th>Sort</th>
+                <th>Coût</th>
+                <th>Effet</th>
+              </tr>
+            </thead>
+            <tbody>
+              {c.spells.map((id) => (
+                <tr key={id}>
+                  <td>
+                    {SPELLS[id].icon} {SPELLS[id].name}
+                  </td>
+                  <td>{SPELLS[id].cost} ✨</td>
+                  <td>{SPELLS[id].desc}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div className="codex-where">
+            Faces en récompense :{' '}
+            {c.facePool.map((f, i) => (
+              <FaceView key={i} face={f} />
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function RelicsTab() {
+  return (
+    <div className="codex-list">
+      {Object.values(RELICS).map((r) => (
+        <div key={r.id} className="codex-entry">
+          <span className="codex-big">{r.icon}</span>
+          <div>
+            <h4>{r.name}</h4>
+            <p>{r.desc}</p>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function describeMove(m: Intent): string {
+  const parts: string[] = [];
+  if (m.dmg !== undefined) parts.push(`⚔️ ${m.dmg}${m.times && m.times > 1 ? `×${m.times}` : ''}`);
+  if (m.block) parts.push(`🛡️ ${m.block}`);
+  if (m.str) parts.push(`💪 +${m.str}`);
+  if (m.heal) parts.push(`💚 ${m.heal}`);
+  if (m.weak) parts.push(`🥀 ${m.weak}`);
+  if (m.vuln) parts.push(`💔 ${m.vuln}`);
+  if (m.poison) parts.push(`🧪 ${m.poison}`);
+  return (m.label ? `${m.label} : ` : '') + (parts.join(' ') || 'rien');
+}
+
+function EnemiesTab() {
+  const tier = (id: string) =>
+    ENCOUNTERS.boss.flat().includes(id) ? 'Boss' : ENCOUNTERS.elite.flat().includes(id) ? 'Élite' : 'Normal';
+  return (
+    <table className="codex-table">
+      <thead>
+        <tr>
+          <th>Ennemi</th>
+          <th>Rang</th>
+          <th>PV</th>
+          <th>Actions ({'cycle = dans l’ordre'})</th>
+        </tr>
+      </thead>
+      <tbody>
+        {Object.values(ENEMIES).map((e) => (
+          <tr key={e.id}>
+            <td>
+              {e.emoji} {e.name}
+            </td>
+            <td>{tier(e.id)}</td>
+            <td>{e.hp[0] === e.hp[1] ? e.hp[0] : `${e.hp[0]}–${e.hp[1]}`}</td>
+            <td>
+              <small>{e.pattern === 'cycle' ? 'cycle' : 'aléatoire'}</small> — {e.moves.map(describeMove).join(' → ')}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+const TABS = [
+  { id: 'rules', name: '📜 Règles & combos', el: RulesTab },
+  { id: 'faces', name: '🎲 Faces', el: FacesTab },
+  { id: 'states', name: '🧪 États', el: StatesTab },
+  { id: 'classes', name: '🧙 Classes & sorts', el: ClassesTab },
+  { id: 'relics', name: '💎 Reliques', el: RelicsTab },
+  { id: 'enemies', name: '👹 Ennemis', el: EnemiesTab },
+];
+
+export function Codex({ onClose }: { onClose: () => void }) {
+  const [tab, setTab] = useState('rules');
+  const Current = TABS.find((t) => t.id === tab)!.el;
+  return (
+    <Modal title="📖 Codex" onClose={onClose}>
+      <div className="tabs">
+        {TABS.map((t) => (
+          <button key={t.id} className={`tab ${tab === t.id ? 'active' : ''}`} onClick={() => setTab(t.id)}>
+            {t.name}
+          </button>
+        ))}
+      </div>
+      <Current />
+    </Modal>
+  );
+}
+
+// ---------- My dice ----------
+
+export function DiceModal({ dice, onClose }: { dice: Face[][]; onClose: () => void }) {
+  const kinds = FACE_ORDER.filter((k) => dice.some((d) => d.some((f) => f.kind === k)));
+  return (
+    <Modal title="🎲 Mes dés" onClose={onClose}>
+      <div className="inventory">
+        {dice.map((faces, di) => (
+          <div key={di} className="inv-die">
+            <span className="inv-label">Dé {di + 1}</span>
+            <div className="inv-faces">
+              {faces.map((face, fi) => (
+                <FaceView key={fi} face={face} />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+      <h3>Probabilités au premier lancer</h3>
+      <table className="codex-table">
+        <thead>
+          <tr>
+            <th>Face</th>
+            <th>Nb de faces</th>
+            <th>Valeur moyenne</th>
+            <th>Au moins 1</th>
+            <th>Nb moyen de dés</th>
+          </tr>
+        </thead>
+        <tbody>
+          {kinds.map((k) => {
+            const all = dice.flatMap((d) => d.filter((f) => f.kind === k));
+            const avg = all.reduce((a, f) => a + f.value, 0) / all.length;
+            const pNone = dice.reduce((p, d) => p * (1 - d.filter((f) => f.kind === k).length / d.length), 1);
+            const expected = dice.reduce((a, d) => a + d.filter((f) => f.kind === k).length / d.length, 0);
+            return (
+              <tr key={k}>
+                <td>
+                  {FACE_INFO[k].icon} {FACE_INFO[k].name}
+                </td>
+                <td>{all.length}</td>
+                <td>{k === 'blank' ? '—' : avg.toFixed(1)}</td>
+                <td>{Math.round((1 - pNone) * 100)} %</td>
+                <td>{expected.toFixed(2)}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </Modal>
+  );
+}

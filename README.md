@@ -14,6 +14,8 @@ Prototype de roguelike tour par tour qui mêle le **Yam** (Yahtzee) et les comba
   5. Les ennemis jouent l'intention affichée au-dessus d'eux.
 - Après chaque combat, choisissez une **nouvelle face** et placez-la sur le dé de votre choix (construction de « deck » via les dés). Les élites et les trésors donnent des **reliques**.
 
+Le **📖 Codex** (écran titre et barre du haut) détaille chaque face, combo, état, sort, relique et ennemi ; **🎲 Mes dés** affiche vos dés et leurs probabilités à tout moment.
+
 Raccourcis clavier en combat : `1`–`5` garder / utiliser un dé, `R` relancer, `Entrée` valider / finir le tour.
 
 ## Lancer en local
