@@ -1,5 +1,5 @@
-import { CLASSES, ENCOUNTERS, RELICS } from './data';
-import { pick, shuffle } from './rng';
+import { CLASSES, ENCOUNTERS, RARE_CHANCE, RELICS } from './data';
+import { pick, randInt, shuffle } from './rng';
 import type { ClassId, Face, MapNode, NodeType, RunState } from './types';
 
 export const FLOORS = 12;
@@ -45,11 +45,13 @@ export function generateMap(): MapNode[][] {
 
 export function newRun(classId: ClassId): RunState {
   const cls = CLASSES[classId];
+  const dice = Array.from({ length: cls.diceCount }, () => cls.die.map((x) => ({ ...x })));
+  if (cls.startRare) dice[cls.startRare.die][cls.startRare.slot] = { ...cls.startRare.face };
   return {
     classId,
     hp: cls.maxHp,
     maxHp: cls.maxHp,
-    dice: Array.from({ length: cls.diceCount }, () => cls.die.map((x) => ({ ...x }))),
+    dice,
     relics: [],
     map: generateMap(),
     floor: -1,
@@ -70,12 +72,17 @@ export function pickEncounter(type: NodeType, floor: number): string[] {
 }
 
 /** Three face rewards from the class pool, slightly stronger deeper in the dungeon. */
-export function faceRewards(run: RunState): Face[] {
-  const pool = CLASSES[run.classId].facePool;
+export function faceRewards(run: RunState, elite = false): Face[] {
+  const cls = CLASSES[run.classId];
   const bonus = Math.floor(Math.max(0, run.floor) / 5);
-  return shuffle(pool)
+  const faces = shuffle(cls.facePool)
     .slice(0, 3)
     .map((x) => ({ kind: x.kind, value: x.value === 0 ? 0 : x.value + (x.kind === 'rage' || x.kind === 'magic' ? 0 : bonus) }));
+  // Sometimes a rare face replaces one of the offers (never scaled with depth).
+  if (cls.rarePool?.length && Math.random() < (elite ? RARE_CHANCE.elite : RARE_CHANCE.combat)) {
+    faces[randInt(0, faces.length - 1)] = { ...pick(cls.rarePool) };
+  }
+  return faces;
 }
 
 export function relicChoices(run: RunState, n: number): string[] {
@@ -100,6 +107,6 @@ export function replaceFace(run: RunState, dieIdx: number, faceIdx: number, face
 
 export function upgradeFace(run: RunState, dieIdx: number, faceIdx: number): RunState {
   const old = run.dice[dieIdx][faceIdx];
-  const up: Face = old.kind === 'blank' ? { kind: 'defend', value: 3 } : { kind: old.kind, value: old.value + (old.kind === 'rage' || old.kind === 'magic' ? 1 : 2) };
+  const up: Face = old.kind === 'blank' ? { kind: 'defend', value: 3 } : { kind: old.kind, value: old.value + (old.kind === 'rage' || old.kind === 'magic' || old.kind === 'venom' ? 1 : 2) };
   return replaceFace(run, dieIdx, faceIdx, up);
 }

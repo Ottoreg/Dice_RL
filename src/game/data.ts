@@ -13,6 +13,7 @@ export const FACE_INFO: Record<FaceKind, { icon: string; name: string; color: st
   poison: { icon: '🧪', name: 'Poison', color: '#8bc34a', desc: (v) => `Applique ${v} Poison à la cible.` },
   rage: { icon: '💢', name: 'Rage', color: '#ff5c8a', desc: (v) => `Gagne ${v} Force pour le combat.` },
   vamp: { icon: '🩸', name: 'Drain', color: '#c2185b', desc: (v) => `Inflige ${v} dégâts, soigne la moitié.` },
+  venom: { icon: '☣️', name: 'Venin', color: '#c6ff00', desc: (v) => `Applique ${v} Poison, puis double le Poison de la cible.` },
   blank: { icon: '❌', name: 'Raté', color: '#555a66', desc: () => 'Ne fait rien.' },
 };
 
@@ -59,9 +60,19 @@ export interface ClassDef {
   poisonBonus: number;
   passive: string;
   die: Face[];
+  /** Special face set on one die at the start of a run. */
+  startRare?: { die: number; slot: number; face: Face };
   spells: string[];
   facePool: Face[];
+  /** Rare faces that can show up as an end-of-combat reward. */
+  rarePool?: Face[];
 }
+
+/** Faces that only appear as rare rewards / starting bonuses. */
+export const RARE_KINDS: FaceKind[] = ['venom'];
+
+/** Chance that one of the three combat rewards is replaced by a rare face. */
+export const RARE_CHANCE = { combat: 0.15, elite: 0.4 };
 
 export const CLASSES: Record<ClassId, ClassDef> = {
   warrior: {
@@ -112,8 +123,10 @@ export const CLASSES: Record<ClassId, ClassDef> = {
     poisonBonus: 1,
     passive: 'Toxines : chaque application de Poison gagne +1.',
     die: [f('dagger', 2), f('dagger', 2), f('poison', 2), f('poison', 2), f('defend', 4), f('magic', 1)],
+    startRare: { die: 0, slot: 3, face: f('venom', 2) },
     spells: ['poisonBlade', 'smokeBomb', 'execute'],
     facePool: [f('dagger', 4), f('dagger', 3), f('poison', 5), f('poison', 4), f('defend', 6), f('magic', 2), f('vamp', 4), f('heal', 4)],
+    rarePool: [f('venom', 2)],
   },
 };
 

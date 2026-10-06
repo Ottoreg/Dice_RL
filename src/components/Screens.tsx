@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { CLASSES, FACE_INFO, RELICS, SPELLS } from '../game/data';
+import { CLASSES, FACE_INFO, RARE_KINDS, RELICS, SPELLS } from '../game/data';
 import { FLOORS, isReachable } from '../game/run';
 import type { ClassId, Face, MapNode, NodeType, RunState } from '../game/types';
 import { Codex, DiceModal } from './Codex';
-import { FaceView } from './Die';
+import { FaceView, StartRareNote } from './Die';
 
 // ---------- Shared ----------
 
@@ -141,6 +141,7 @@ export function ClassSelect({ onPick }: { onPick: (id: ClassId) => void }) {
                   <FaceView key={i} face={face} />
                 ))}
               </div>
+              <StartRareNote classId={c.id} />
             </div>
             <div className="class-spells">
               {c.spells.map((id) => (
@@ -273,7 +274,8 @@ export function FaceReward({
           <p>Choisissez une nouvelle face de dé :</p>
           <div className="reward-faces">
             {faces.map((face, i) => (
-              <div key={i} className="reward-card" onClick={() => setChosen(face)}>
+              <div key={i} className={`reward-card ${RARE_KINDS.includes(face.kind) ? 'rare' : ''}`} onClick={() => setChosen(face)}>
+                {RARE_KINDS.includes(face.kind) && <span className="rare-badge">✦ Rare</span>}
                 <FaceView face={face} size="lg" />
                 <b>{FACE_INFO[face.kind].name}</b>
                 <span>{FACE_INFO[face.kind].desc(face.value)}</span>

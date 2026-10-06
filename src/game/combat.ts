@@ -381,6 +381,15 @@ export function useDie(prev: CombatState, i: number): CombatState {
         log(s, `${info.icon} Vous drainez ${target.name}.`);
       }
       break;
+    case 'venom':
+      if (target) {
+        anim(s, target.uid, 'venom');
+        applyPoison(s, target, v);
+        target.poison *= 2;
+        fx(s, target.uid, `☣️ ×2 → ${target.poison}`, 'debuff');
+        log(s, `${info.icon} Le venin double le poison de ${target.name} (${target.poison}).`);
+      }
+      break;
     case 'blank':
       anim(s, 'player', 'blank');
       log(s, `${info.icon} Raté…`);

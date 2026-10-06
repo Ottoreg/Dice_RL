@@ -56,7 +56,7 @@ export default function App() {
       return;
     }
     const relic = node.type === 'elite' ? (relicChoices(r, 1)[0] ?? null) : null;
-    setScreen({ kind: 'reward', faces: faceRewards(r), relic });
+    setScreen({ kind: 'reward', faces: faceRewards(r, node.type === 'elite'), relic });
   };
 
   if (screen.kind === 'title') return <TitleScreen onStart={() => setScreen({ kind: 'class' })} />;

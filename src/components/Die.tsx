@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { FACE_INFO } from '../game/data';
-import type { Face } from '../game/types';
+import { CLASSES, FACE_INFO, RARE_KINDS } from '../game/data';
+import type { ClassId, Face } from '../game/types';
 
 interface FaceViewProps {
   face: Face;
@@ -19,13 +19,25 @@ export function FaceView({ face, size = 'sm', value, label, onClick, selected, t
   const shown = value ?? face.value;
   return (
     <div
-      className={`face face-${size} ${onClick ? 'clickable' : ''} ${selected ? 'selected' : ''}`}
+      className={`face face-${size} ${onClick ? 'clickable' : ''} ${selected ? 'selected' : ''} ${RARE_KINDS.includes(face.kind) ? 'rare' : ''}`}
       style={{ '--face-color': info.color } as React.CSSProperties}
       onClick={onClick}
       title={title ?? `${info.name} — ${info.desc(shown)}`}
     >
       <span className="face-icon">{info.icon}</span>
       {face.kind !== 'blank' && <span className="face-value">{label ?? shown}</span>}
+    </div>
+  );
+}
+
+/** "Dé 1 : ☣️2 remplace 🧪2" for classes that start with a rare face. */
+export function StartRareNote({ classId }: { classId: ClassId }) {
+  const c = CLASSES[classId];
+  if (!c.startRare) return null;
+  const { die, slot, face } = c.startRare;
+  return (
+    <div className="rare-note">
+      ✦ Dé {die + 1} : <FaceView face={face} /> remplace <FaceView face={c.die[slot]} />
     </div>
   );
 }

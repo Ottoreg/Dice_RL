@@ -9,6 +9,7 @@ export type FaceKind =
   | 'poison'
   | 'rage'
   | 'vamp'
+  | 'venom'
   | 'blank';
 
 export interface Face {
@@ -86,6 +87,7 @@ export type AnimKind =
   | 'poison'
   | 'rage'
   | 'vamp'
+  | 'venom'
   | 'blank'
   | 'whirlwind'
   | 'ice'

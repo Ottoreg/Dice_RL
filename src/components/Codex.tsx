@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { CLASSES, COMBO_MULT, COMBO_NAMES, ENCOUNTERS, ENEMIES, FACE_INFO, RELICS, SPELLS } from '../game/data';
 import type { Face, FaceKind, Intent } from '../game/types';
-import { FaceView } from './Die';
+import { FaceView, StartRareNote } from './Die';
 
 export function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
   useEffect(() => {
@@ -73,18 +73,30 @@ const FACE_DETAILS: Record<FaceKind, { effect: string; notes: string[] }> = {
     effect: 'Inflige X dégâts à la cible et vous soigne de la moitié des PV qu’elle perd.',
     notes: ['Ajoute votre Force.', 'Les dégâts absorbés par l’armure ne soignent pas. Le soin est arrondi au supérieur.'],
   },
+  venom: {
+    effect: 'Applique X Poison à la cible, puis double tout son Poison.',
+    notes: [
+      'Face rare. Le X profite des combos et des bonus de Poison (Toxines du Voleur, Fiole toxique), puis le total est doublé.',
+      'Exemple : avec 5 Poison sur la cible, ☣️2 du Voleur donne 5 + 3 = 8, doublé à 16.',
+      'Utilisez-la après vos autres faces 🧪 pour doubler un maximum. Ne forme pas de combo avec 🧪.',
+      'À la Forge : +1.',
+    ],
+  },
   blank: { effect: 'Ne fait rien.', notes: ['Ne compte pas dans les combos et empêche la Suite.', 'Au feu de camp, la Forge la transforme en 🛡️3.'] },
 };
 
-const FACE_ORDER: FaceKind[] = ['attack', 'dagger', 'fire', 'frost', 'vamp', 'poison', 'defend', 'heal', 'magic', 'rage', 'blank'];
+const FACE_ORDER: FaceKind[] = ['attack', 'dagger', 'fire', 'frost', 'vamp', 'poison', 'venom', 'defend', 'heal', 'magic', 'rage', 'blank'];
 
 function whereFound(kind: FaceKind): string[] {
   const out: string[] = [];
   for (const c of Object.values(CLASSES)) {
     const start = c.die.filter((f) => f.kind === kind).map((f) => f.value);
     const pool = c.facePool.filter((f) => f.kind === kind).map((f) => f.value);
+    const rare = (c.rarePool ?? []).filter((f) => f.kind === kind).map((f) => f.value);
     if (start.length) out.push(`${c.emoji} ${c.name}, dé de départ : ${start.join(', ')}`);
+    if (c.startRare?.face.kind === kind) out.push(`${c.emoji} ${c.name}, dé ${c.startRare.die + 1} au départ : ${c.startRare.face.value}`);
     if (pool.length) out.push(`${c.emoji} ${c.name}, récompenses : ${pool.join(', ')}`);
+    if (rare.length) out.push(`${c.emoji} ${c.name}, récompense rare : ${rare.join(', ')}`);
   }
   return out;
 }
@@ -192,13 +204,17 @@ function RulesTab() {
           l’étage 6, les faces proposées gagnent +1 (+2 dès l’étage 11), sauf ✨ et 💢.
         </li>
         <li>
+          <b>Face rare</b> : après un combat, une des 3 faces proposées peut être remplacée par une face rare de votre classe (15 % de chance,
+          40 % contre une élite). Pour l’instant, seul le Voleur en a une : ☣️ Venin.
+        </li>
+        <li>
           <b>Élite</b> : récompense de face + une relique.
         </li>
         <li>
           <b>Trésor</b> : choisissez 1 relique parmi 3.
         </li>
         <li>
-          <b>Feu de camp</b> : soignez 30 % de vos PV max, ou forgez une face (+2, ou +1 pour ✨ et 💢, et ❌ devient 🛡️3).
+          <b>Feu de camp</b> : soignez 30 % de vos PV max, ou forgez une face (+2, ou +1 pour ✨, 💢 et ☣️, et ❌ devient 🛡️3).
         </li>
         <li>
           Les ennemis normaux gagnent +2 % de PV par étage. Le Dragon ancien attend au 12e étage.
@@ -277,6 +293,7 @@ function ClassesTab() {
               <FaceView key={i} face={f} />
             ))}
           </div>
+          <StartRareNote classId={c.id} />
           <table className="codex-table">
             <thead>
               <tr>
@@ -302,6 +319,14 @@ function ClassesTab() {
             {c.facePool.map((f, i) => (
               <FaceView key={i} face={f} />
             ))}
+            {c.rarePool?.length ? (
+              <>
+                {' '}· rare :{' '}
+                {c.rarePool.map((f, i) => (
+                  <FaceView key={`r${i}`} face={f} />
+                ))}
+              </>
+            ) : null}
           </div>
         </div>
       ))}

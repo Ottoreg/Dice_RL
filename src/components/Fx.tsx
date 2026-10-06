@@ -42,6 +42,11 @@ const FX: Record<Exclude<AnimKind, 'lunge'>, FxDef> = {
   rage: { motion: 'pop', flash: '#ff3d6e', particles: [{ e: '💢', s: 1.7 }] },
   vamp: { motion: 'fall', flash: '#c2185b', particles: [{ e: '🩸', x: -18 }, { e: '🩸', x: 16, d: 110 }, { e: '🩸', d: 220, s: 1.3 }] },
   blank: { motion: 'rise', particles: [{ e: '💨', s: 1.4 }] },
+  venom: {
+    motion: 'pop',
+    flash: '#c6ff00',
+    particles: [{ e: '☣️', s: 1.8 }, { e: '🧪', s: 1.2, d: 200 }],
+  },
   whirlwind: { motion: 'spin', flash: '#cfd8dc', particles: [{ e: '🌪️', s: 1.8 }] },
   ice: { motion: 'fall', flash: '#9be7ff', particles: [{ e: '🧊', s: 2 }] },
   smoke: { motion: 'burst', flash: '#90a4ae', particles: [{ e: '💨', x: -36, y: 0, s: 1.4 }, { e: '💨', x: 36, y: -10, d: 60, s: 1.4 }, { e: '💨', x: 0, y: -30, d: 120, s: 1.2 }] },
