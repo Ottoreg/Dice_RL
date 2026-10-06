@@ -1,4 +1,4 @@
-import { CLASSES, COMBO_MULT, COMBO_NAMES, ENEMIES, FACE_INFO, SPELLS } from './data';
+import { CLASSES, COMBO_MULT, COMBO_NAMES, ENEMIES, FACE_INFO, SPELLS, hasValue } from './data';
 import { randInt } from './rng';
 import type { AnimKind, CombatState, Combo, DieState, EnemyState, FaceKind, Fighter, FxEvent, Intent, RunState } from './types';
 
@@ -291,7 +291,7 @@ export function confirmDice(prev: CombatState): CombatState {
 
 export function dieValue(s: CombatState, d: DieState, mult = d.mult): number {
   const face = d.faces[d.faceIdx];
-  if (face.kind === 'blank') return 0;
+  if (!hasValue(face.kind)) return 0;
   let base = face.value;
   if (s.relics.includes('whetstone') && (face.kind === 'attack' || face.kind === 'dagger')) base += 1;
   if (s.suite) base += 2;
@@ -389,6 +389,21 @@ export function useDie(prev: CombatState, i: number): CombatState {
         fx(s, target.uid, `☣️ ×2 → ${target.poison}`, 'debuff');
         log(s, `${info.icon} Le venin double le poison de ${target.name} (${target.poison}).`);
       }
+      break;
+    case 'cleave':
+      for (const e of alive(s)) {
+        anim(s, e.uid, 'slash');
+        playerHits(s, e, v);
+      }
+      log(s, `${info.icon} Votre fendoir balaie tous les ennemis.`);
+      break;
+    case 'rebirth':
+      anim(s, 'player', 'heal');
+      anim(s, 'player', 'magic');
+      heal(s, s.player, 'player', s.player.maxHp - s.player.hp);
+      // One use only: the face is permanently replaced by a blank.
+      d.faces = d.faces.map((x, j) => (j === d.faceIdx ? { kind: 'blank', value: 0 } : x));
+      log(s, `${info.icon} Renaissance ! Vous récupérez tous vos PV. La face devient ❌ Raté.`);
       break;
     case 'blank':
       anim(s, 'player', 'blank');

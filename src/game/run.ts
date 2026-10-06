@@ -1,4 +1,4 @@
-import { CLASSES, ENCOUNTERS, RARE_CHANCE, RELICS } from './data';
+import { CLASSES, ENCOUNTERS, RARE_CHANCE, RELICS, hasValue } from './data';
 import { pick, randInt, shuffle } from './rng';
 import type { ClassId, Face, MapNode, NodeType, RunState } from './types';
 
@@ -105,8 +105,17 @@ export function replaceFace(run: RunState, dieIdx: number, faceIdx: number, face
   return { ...run, dice };
 }
 
+/** The forge can improve any face that has a number, and turns ❌ into 🛡️3. */
+export const canUpgrade = (face: Face) => face.kind === 'blank' || hasValue(face.kind);
+
+/** What a face becomes at the forge. */
+export function upgradedFace(old: Face): Face {
+  if (old.kind === 'blank') return { kind: 'defend', value: 3 };
+  return { kind: old.kind, value: old.value + (old.kind === 'rage' || old.kind === 'magic' || old.kind === 'venom' ? 1 : 2) };
+}
+
 export function upgradeFace(run: RunState, dieIdx: number, faceIdx: number): RunState {
   const old = run.dice[dieIdx][faceIdx];
-  const up: Face = old.kind === 'blank' ? { kind: 'defend', value: 3 } : { kind: old.kind, value: old.value + (old.kind === 'rage' || old.kind === 'magic' || old.kind === 'venom' ? 1 : 2) };
-  return replaceFace(run, dieIdx, faceIdx, up);
+  if (!canUpgrade(old)) return run;
+  return replaceFace(run, dieIdx, faceIdx, upgradedFace(old));
 }

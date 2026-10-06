@@ -1,17 +1,20 @@
 import { useEffect, useRef, useState } from 'react';
 import { CLASSES, FACE_INFO, RARE_KINDS, RELICS, SPELLS } from '../game/data';
-import { FLOORS, isReachable } from '../game/run';
+import { FLOORS, canUpgrade, isReachable } from '../game/run';
 import type { ClassId, Face, MapNode, NodeType, RunState } from '../game/types';
 import { Codex, DiceModal } from './Codex';
 import { FaceView, StartRareNote } from './Die';
+import { ForgeAnimation, ForgePreview } from './Forge';
 
 // ---------- Shared ----------
 
 export function DiceInventory({
   dice,
   onPick,
+  canPick,
   highlight,
 }: {
+  canPick?: (f: Face) => boolean;
   dice: Face[][];
   onPick?: (die: number, face: number) => void;
   highlight?: (f: Face) => boolean;
@@ -26,7 +29,7 @@ export function DiceInventory({
               <FaceView
                 key={fi}
                 face={face}
-                onClick={onPick ? () => onPick(di, fi) : undefined}
+                onClick={onPick && (canPick?.(face) ?? true) ? () => onPick(di, fi) : undefined}
                 selected={highlight?.(face)}
               />
             ))}
@@ -310,7 +313,8 @@ export function RestScreen({
   onHeal: () => void;
   onUpgrade: (die: number, slot: number) => void;
 }) {
-  const [mode, setMode] = useState<'choose' | 'upgrade'>('choose');
+  const [mode, setMode] = useState<'choose' | 'upgrade' | 'preview' | 'forging'>('choose');
+  const [pick, setPick] = useState<{ die: number; slot: number } | null>(null);
   const healAmt = Math.round(run.maxHp * 0.3);
   return (
     <div className="screen">
@@ -326,17 +330,33 @@ export function RestScreen({
           <div className="reward-card" onClick={() => setMode('upgrade')}>
             <span className="big-icon">⚒️</span>
             <b>Forger</b>
-            <span>Améliore une face de dé (+2, ou +1 pour ✨/💢). Un ❌ devient 🛡️3.</span>
+            <span>Améliore une face de dé (+2, ou +1 pour ✨, 💢 et ☣️). Un ❌ devient 🛡️3.</span>
           </div>
         </div>
-      ) : (
+      ) : mode === 'upgrade' || !pick ? (
         <>
           <p>Choisissez la face à améliorer :</p>
-          <DiceInventory dice={run.dice} onPick={onUpgrade} />
+          <DiceInventory
+            dice={run.dice}
+            onPick={(die, slot) => {
+              setPick({ die, slot });
+              setMode('preview');
+            }}
+            canPick={canUpgrade}
+          />
           <button className="btn" onClick={() => setMode('choose')}>
             ← Retour
           </button>
         </>
+      ) : mode === 'preview' ? (
+        <>
+          <p>
+            Dé {pick.die + 1} : confirmez la forge ou choisissez une autre face.
+          </p>
+          <ForgePreview faces={run.dice[pick.die]} slot={pick.slot} onConfirm={() => setMode('forging')} onCancel={() => setMode('upgrade')} />
+        </>
+      ) : (
+        <ForgeAnimation faces={run.dice[pick.die]} slot={pick.slot} onDone={() => onUpgrade(pick.die, pick.slot)} />
       )}
     </div>
   );

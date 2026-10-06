@@ -14,10 +14,16 @@ export const FACE_INFO: Record<FaceKind, { icon: string; name: string; color: st
   rage: { icon: '💢', name: 'Rage', color: '#ff5c8a', desc: (v) => `Gagne ${v} Force pour le combat.` },
   vamp: { icon: '🩸', name: 'Drain', color: '#c2185b', desc: (v) => `Inflige ${v} dégâts, soigne la moitié.` },
   venom: { icon: '☣️', name: 'Venin', color: '#c6ff00', desc: (v) => `Applique ${v} Poison, puis double le Poison de la cible.` },
+  cleave: { icon: '🪓', name: 'Fendoir', color: '#ff7043', desc: (v) => `Inflige ${v} dégâts à tous les ennemis.` },
+  rebirth: { icon: '💖', name: 'Renaissance', color: '#ff7eb6', desc: () => 'Rend tous vos PV, puis cette face devient ❌ Raté pour de bon.' },
   blank: { icon: '❌', name: 'Raté', color: '#555a66', desc: () => 'Ne fait rien.' },
 };
 
 export const f = (kind: FaceKind, value = 0): Face => ({ kind, value });
+
+/** Faces whose effect has no number. */
+export const VALUELESS: FaceKind[] = ['blank', 'rebirth'];
+export const hasValue = (kind: FaceKind) => !VALUELESS.includes(kind);
 
 // ---------- Spells ----------
 
@@ -69,7 +75,7 @@ export interface ClassDef {
 }
 
 /** Faces that only appear as rare rewards / starting bonuses. */
-export const RARE_KINDS: FaceKind[] = ['venom'];
+export const RARE_KINDS: FaceKind[] = ['venom', 'cleave', 'rebirth'];
 
 /** Chance that one of the three combat rewards is replaced by a rare face. */
 export const RARE_CHANCE = { combat: 0.15, elite: 0.4 };
@@ -91,6 +97,7 @@ export const CLASSES: Record<ClassId, ClassDef> = {
     die: [f('attack', 6), f('attack', 6), f('defend', 5), f('defend', 5), f('magic', 2), f('blank')],
     spells: ['heroicStrike', 'warCry', 'whirlwind'],
     facePool: [f('attack', 9), f('attack', 8), f('defend', 9), f('rage', 1), f('vamp', 6), f('heal', 6), f('magic', 3), f('fire', 4)],
+    rarePool: [f('cleave', 7)],
   },
   mage: {
     id: 'mage',
@@ -108,6 +115,7 @@ export const CLASSES: Record<ClassId, ClassDef> = {
     die: [f('fire', 3), f('frost', 4), f('magic', 2), f('magic', 2), f('defend', 4), f('blank')],
     spells: ['fireball', 'frostNova', 'arcaneBarrier', 'icePrison'],
     facePool: [f('fire', 5), f('frost', 6), f('magic', 3), f('magic', 4), f('defend', 7), f('heal', 5), f('attack', 7), f('vamp', 4)],
+    rarePool: [f('rebirth')],
   },
   rogue: {
     id: 'rogue',

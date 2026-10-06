@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { CLASSES, COMBO_MULT, COMBO_NAMES, ENCOUNTERS, ENEMIES, FACE_INFO, RELICS, SPELLS } from '../game/data';
+import { CLASSES, COMBO_MULT, COMBO_NAMES, ENCOUNTERS, ENEMIES, FACE_INFO, RELICS, SPELLS, hasValue } from '../game/data';
 import type { Face, FaceKind, Intent } from '../game/types';
 import { FaceView, StartRareNote } from './Die';
 
@@ -82,10 +82,23 @@ const FACE_DETAILS: Record<FaceKind, { effect: string; notes: string[] }> = {
       'À la Forge : +1.',
     ],
   },
+  cleave: {
+    effect: 'Inflige X dégâts à tous les ennemis, comme le sort Tourbillon.',
+    notes: ['Face rare du Guerrier, obtenue uniquement en récompense.', 'Ajoute votre Force à chaque ennemi touché.', 'Ne forme pas de combo avec 🔥 Feu.'],
+  },
+  rebirth: {
+    effect: 'Vous récupérez tous vos PV.',
+    notes: [
+      'Face rare du Mage, obtenue uniquement en récompense.',
+      'Usage unique : une fois utilisée, la face devient ❌ Raté pour le reste de la partie.',
+      'Si elle sort quand vous êtes en pleine forme, vous pouvez ne pas l’utiliser : elle reste disponible pour un prochain lancer.',
+      'Ne peut pas être améliorée à la Forge.',
+    ],
+  },
   blank: { effect: 'Ne fait rien.', notes: ['Ne compte pas dans les combos et empêche la Suite.', 'Au feu de camp, la Forge la transforme en 🛡️3.'] },
 };
 
-const FACE_ORDER: FaceKind[] = ['attack', 'dagger', 'fire', 'frost', 'vamp', 'poison', 'venom', 'defend', 'heal', 'magic', 'rage', 'blank'];
+const FACE_ORDER: FaceKind[] = ['attack', 'dagger', 'cleave', 'fire', 'frost', 'vamp', 'poison', 'venom', 'defend', 'heal', 'rebirth', 'magic', 'rage', 'blank'];
 
 function whereFound(kind: FaceKind): string[] {
   const out: string[] = [];
@@ -205,7 +218,7 @@ function RulesTab() {
         </li>
         <li>
           <b>Face rare</b> : après un combat, une des 3 faces proposées peut être remplacée par une face rare de votre classe (15 % de chance,
-          40 % contre une élite). Pour l’instant, seul le Voleur en a une : ☣️ Venin.
+          40 % contre une élite). Guerrier : 🪓 Fendoir. Mage : 💖 Renaissance. Voleur : ☣️ Venin (qu’il a aussi sur son premier dé au départ).
         </li>
         <li>
           <b>Élite</b> : récompense de face + une relique.
@@ -214,7 +227,7 @@ function RulesTab() {
           <b>Trésor</b> : choisissez 1 relique parmi 3.
         </li>
         <li>
-          <b>Feu de camp</b> : soignez 30 % de vos PV max, ou forgez une face (+2, ou +1 pour ✨, 💢 et ☣️, et ❌ devient 🛡️3).
+          <b>Feu de camp</b> : soignez 30 % de vos PV max, ou forgez une face (+2, ou +1 pour ✨, 💢 et ☣️, et ❌ devient 🛡️3 ; 💖 ne peut pas être forgée).
         </li>
         <li>
           Les ennemis normaux gagnent +2 % de PV par étage. Le Dragon ancien attend au 12e étage.
@@ -460,7 +473,7 @@ export function DiceModal({ dice, onClose }: { dice: Face[][]; onClose: () => vo
                   {FACE_INFO[k].icon} {FACE_INFO[k].name}
                 </td>
                 <td>{all.length}</td>
-                <td>{k === 'blank' ? '—' : avg.toFixed(1)}</td>
+                <td>{hasValue(k) ? avg.toFixed(1) : '—'}</td>
                 <td>{Math.round((1 - pNone) * 100)} %</td>
                 <td>{expected.toFixed(2)}</td>
               </tr>

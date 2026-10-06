@@ -16,7 +16,7 @@ import {
   useDie,
 } from '../game/combat';
 import { CLASSES, FACE_INFO, SPELLS } from '../game/data';
-import type { AnimEvent, CombatState, Fighter, FxEvent } from '../game/types';
+import type { AnimEvent, CombatState, Face, Fighter, FxEvent } from '../game/types';
 import { Die, ROLL_MS } from './Die';
 import { DiceBoard } from './DiceBoard';
 import { EffectLayer } from './Fx';
@@ -27,7 +27,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 interface Props {
   initial: CombatState;
-  onEnd: (result: { won: boolean; hp: number }) => void;
+  onEnd: (result: { won: boolean; hp: number; dice: Face[][] }) => void;
 }
 
 export function CombatScreen({ initial, onEnd }: Props) {
@@ -278,7 +278,7 @@ export function CombatScreen({ initial, onEnd }: Props) {
         <div className="overlay">
           <div className="modal">
             <h2>{s.phase === 'won' ? '🏆 Victoire !' : '☠️ Défaite'}</h2>
-            <button className="btn primary" onClick={() => onEnd({ won: s.phase === 'won', hp: s.player.hp })}>
+            <button className="btn primary" onClick={() => onEnd({ won: s.phase === 'won', hp: s.player.hp, dice: s.dice.map((d) => d.faces) })}>
               Continuer
             </button>
           </div>

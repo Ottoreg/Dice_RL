@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { CLASSES, FACE_INFO, RARE_KINDS } from '../game/data';
+import { CLASSES, FACE_INFO, RARE_KINDS, hasValue } from '../game/data';
 import type { ClassId, Face } from '../game/types';
 
 interface FaceViewProps {
@@ -25,7 +25,7 @@ export function FaceView({ face, size = 'sm', value, label, onClick, selected, t
       title={title ?? `${info.name} — ${info.desc(shown)}`}
     >
       <span className="face-icon">{info.icon}</span>
-      {face.kind !== 'blank' && <span className="face-value">{label ?? shown}</span>}
+      {hasValue(face.kind) && <span className="face-value">{label ?? shown}</span>}
     </div>
   );
 }
@@ -59,8 +59,8 @@ interface DieProps {
 export const ROLL_MS = 900;
 
 /** Where each of the 6 faces sits on the cube, and the cube rotation that brings it to the front. */
-const PLACEMENT = ['rotateY(0deg)', 'rotateY(90deg)', 'rotateY(180deg)', 'rotateY(-90deg)', 'rotateX(90deg)', 'rotateX(-90deg)'];
-const ORIENT = [
+export const PLACEMENT = ['rotateY(0deg)', 'rotateY(90deg)', 'rotateY(180deg)', 'rotateY(-90deg)', 'rotateX(90deg)', 'rotateX(-90deg)'];
+export const ORIENT = [
   { x: 0, y: 0 },
   { x: 0, y: -90 },
   { x: 0, y: -180 },
@@ -108,7 +108,7 @@ export function Die({ faces, faceIdx, rollId, rolling, locked, used, mult, value
       style={{ '--face-color': info.color } as React.CSSProperties}
       onClick={onClick}
       disabled={disabled || used}
-      title={`${info.name} — ${info.desc(value)}\nFaces : ${faces.map((x) => FACE_INFO[x.kind].icon + (x.kind === 'blank' ? '' : x.value)).join('  ')}`}
+      title={`${info.name} — ${info.desc(value)}\nFaces : ${faces.map((x) => FACE_INFO[x.kind].icon + (hasValue(x.kind) ? x.value : '')).join('  ')}`}
     >
       <div className="cube-wrap">
       <div className="cube" style={{ transform: `rotateX(${rot.x}deg) rotateY(${rot.y}deg)` }}>
@@ -122,7 +122,7 @@ export function Die({ faces, faceIdx, rollId, rolling, locked, used, mult, value
               style={{ '--face-color': fi.color, transform: `${PLACEMENT[i]} translateZ(calc(var(--die-size) / 2))` } as React.CSSProperties}
             >
               <span className="die-icon">{fi.icon}</span>
-              {f.kind !== 'blank' && <span className="die-value">{shown}</span>}
+              {hasValue(f.kind) && <span className="die-value">{shown}</span>}
             </div>
           );
         })}
