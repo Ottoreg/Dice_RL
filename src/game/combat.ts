@@ -46,6 +46,9 @@ function nextMove(e: EnemyState) {
   }
 }
 
+/** After ticking, poison is halved (rounded down), so a stack of 1 wears off. */
+export const decayPoison = (p: number) => Math.floor(p / 2);
+
 /** Damage an attacker would deal with a given base, before the defender's block. */
 export function attackDamage(attacker: Fighter, defender: Fighter, base: number): number {
   let d = base + attacker.strength;
@@ -189,7 +192,7 @@ export function startPlayerTurn(prev: CombatState): CombatState {
     anim(s, 'player', 'poison');
     log(s, `🧪 Le poison vous inflige ${s.player.poison} dégâts.`);
     hurt(s, s.player, 'player', s.player.poison, true);
-    s.player.poison -= 1;
+    s.player.poison = decayPoison(s.player.poison);
     checkEnd(s);
     if (s.player.hp <= 0) return s;
   }
@@ -495,7 +498,7 @@ export function beginEnemyTurn(prev: CombatState): CombatState {
       anim(s, e.uid, 'poison');
       log(s, `🧪 ${e.name} subit ${e.poison} dégâts de poison.`);
       hurt(s, e, e.uid, e.poison, true);
-      e.poison -= 1;
+      e.poison = decayPoison(e.poison);
     }
   }
   checkEnd(s);

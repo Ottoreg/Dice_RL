@@ -18,6 +18,7 @@ import {
 import { CLASSES, FACE_INFO, SPELLS } from '../game/data';
 import type { AnimEvent, CombatState, Fighter, FxEvent } from '../game/types';
 import { Die, ROLL_MS } from './Die';
+import { DiceBoard } from './DiceBoard';
 import { EffectLayer } from './Fx';
 
 const DAMAGE_KINDS = ['attack', 'dagger', 'fire', 'frost', 'vamp'];
@@ -104,6 +105,7 @@ export function CombatScreen({ initial, onEnd }: Props) {
   // Keyboard shortcuts.
   useEffect(() => {
     const onKey = (ev: KeyboardEvent) => {
+      if (settling) return;
       if (ev.key === 'r' || ev.key === 'R') setS((x) => reroll(x));
       if (ev.key === 'Enter') {
         ev.preventDefault();
@@ -118,7 +120,7 @@ export function CombatScreen({ initial, onEnd }: Props) {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [s.phase, s.dice.length, runEnemyTurn]);
+  }, [s.phase, s.dice.length, runEnemyTurn, settling]);
 
   const floatersFor = (target: 'player' | number) =>
     floaters
@@ -164,8 +166,7 @@ export function CombatScreen({ initial, onEnd }: Props) {
       <div className="combo-banner">
         {s.phase === 'rolling' && !settling && preview && (preview.combos.length > 0 || preview.suite) && (
           <span className="preview">
-            Combos en vue :{' '}
-            {preview.combos.map((c) => `${c.name} ${FACE_INFO[c.kind].icon} ×${c.mult}`).join(' · ')}
+            Combos en vue : {preview.combos.map((c) => `${c.name} ${FACE_INFO[c.kind].icon} ×${c.mult}`).join(' · ')}
             {preview.suite && ' · Suite (+2)'}
           </span>
         )}
@@ -185,7 +186,9 @@ export function CombatScreen({ initial, onEnd }: Props) {
             <div className="player-name">{cls.name}</div>
             <HpBar f={s.player} />
             <Statuses f={s.player} />
-            <div className="mana">✨ Mana : <b>{s.player.mana}</b></div>
+            <div className="mana">
+              ✨ Mana : <b>{s.player.mana}</b>
+            </div>
           </div>
           <EffectLayer anims={animsFor('player')} />
           <div className="floaters">{floatersFor('player')}</div>
@@ -195,39 +198,48 @@ export function CombatScreen({ initial, onEnd }: Props) {
           <div className="phase-hint">
             {s.phase === 'rolling' &&
               (s.rerollsLeft > 0
-                ? 'Cliquez sur les dés pour les garder 🔒, puis relancez les autres — comme au Yam !'
+                ? 'Cliquez sur les dés du plateau pour les garder 🔒, puis relancez les autres, comme au Yam !'
                 : 'Plus de relance : validez vos dés.')}
             {s.phase === 'acting' && 'Cliquez sur un dé pour l’utiliser (cible : 🎯). Lancez des sorts avec votre mana.'}
             {s.phase === 'enemy' && '…'}
           </div>
-          <div className="dice-row">
-            {s.dice.map((d, i) => (
-              <Die
-                key={i}
-                faces={d.faces}
-                faceIdx={d.faceIdx}
-                rollId={s.rollId}
-                rolling={!d.locked}
-                locked={d.locked}
-                used={d.used}
-                mult={preview ? preview.mults[i] : d.mult}
-                value={
-                  (preview ? dieValue({ ...s, suite: preview.suite }, d, preview.mults[i]) : dieValue(s, d)) +
-                  (DAMAGE_KINDS.includes(d.faces[d.faceIdx].kind) ? s.player.strength : 0)
-                }
-                combo={(preview ? preview.mults[i] : d.mult) > 1}
-                disabled={s.phase !== 'rolling' && s.phase !== 'acting'}
-                onClick={() => setS((x) => (x.phase === 'rolling' ? toggleLock(x, i) : useDie(x, i)))}
-              />
-            ))}
-          </div>
+          <DiceBoard
+            count={s.dice.length}
+            rollId={s.rollId}
+            locked={s.dice.map((d) => d.locked)}
+            renderDie={(i) => {
+              const d = s.dice[i];
+              return (
+                <Die
+                  faces={d.faces}
+                  faceIdx={d.faceIdx}
+                  rollId={s.rollId}
+                  rolling={!d.locked}
+                  locked={d.locked}
+                  used={d.used}
+                  mult={preview ? preview.mults[i] : d.mult}
+                  value={
+                    (preview ? dieValue({ ...s, suite: preview.suite }, d, preview.mults[i]) : dieValue(s, d)) +
+                    (DAMAGE_KINDS.includes(d.faces[d.faceIdx].kind) ? s.player.strength : 0)
+                  }
+                  combo={(preview ? preview.mults[i] : d.mult) > 1}
+                  disabled={s.phase !== 'rolling' && s.phase !== 'acting'}
+                  onClick={() => setS((x) => (x.phase === 'rolling' ? toggleLock(x, i) : useDie(x, i)))}
+                />
+              );
+            }}
+          />
           <div className="dice-actions">
             {s.phase === 'rolling' && (
               <>
-                <button className="btn" onClick={() => setS((x) => reroll(x))} disabled={s.rerollsLeft <= 0 || s.dice.every((d) => d.locked)}>
+                <button
+                  className="btn"
+                  onClick={() => setS((x) => reroll(x))}
+                  disabled={settling || s.rerollsLeft <= 0 || s.dice.every((d) => d.locked)}
+                >
                   🎲 Relancer ({s.rerollsLeft})
                 </button>
-                <button className="btn primary" onClick={() => setS((x) => confirmDice(x))}>
+                <button className="btn primary" onClick={() => setS((x) => confirmDice(x))} disabled={settling}>
                   ✅ Valider les dés
                 </button>
               </>
@@ -294,7 +306,7 @@ function Statuses({ f, frozen }: { f: Fighter; frozen?: boolean }) {
   if (f.strength) items.push(['💪', `${f.strength}`, `Force : +${f.strength} dégâts par attaque`]);
   if (f.weak) items.push(['🥀', `${f.weak}`, `Faiblesse : -25% dégâts (${f.weak} tours)`]);
   if (f.vulnerable) items.push(['💔', `${f.vulnerable}`, `Vulnérable : +50% dégâts subis (${f.vulnerable} tours)`]);
-  if (f.poison) items.push(['🧪', `${f.poison}`, `Poison : perd ${f.poison} PV au début du tour, puis -1`]);
+  if (f.poison) items.push(['🧪', `${f.poison}`, `Poison : perd ${f.poison} PV au début du tour, puis le Poison est divisé par 2`]);
   if (frozen) items.push(['🧊', '', 'Gelé : passe son prochain tour']);
   return (
     <div className="statuses">

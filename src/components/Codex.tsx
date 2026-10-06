@@ -226,7 +226,7 @@ const STATES: { icon: string; name: string; text: string }[] = [
   {
     icon: '🧪',
     name: 'Poison',
-    text: 'Au début de son tour, la victime perd autant de PV que son Poison (l’armure ne protège pas), puis le Poison baisse de 1. Les applications s’additionnent. Une pile de N inflige au total N + (N−1) + … + 1 dégâts si on ne la recharge pas.',
+    text: 'Au début de son tour, la victime perd autant de PV que son Poison (l’armure ne protège pas), puis le Poison est divisé par 2, arrondi à l’inférieur. Les applications s’additionnent. Sans recharge, une pile inflige au total environ 2 fois sa valeur de départ.',
   },
   { icon: '🧊', name: 'Gel', text: 'La cible passe sa prochaine action, qui est perdue. Au tour suivant, elle enchaîne sur son action suivante.' },
 ];
@@ -245,8 +245,8 @@ function StatesTab() {
       ))}
       <h3>Exemple de poison</h3>
       <p className="codex-intro">
-        5 Poison sur un ennemi : 5 dégâts au début de son tour, puis 4, 3, 2 et 1, soit 15 dégâts en tout. Si vous en rajoutez 3 alors qu’il en reste 4,
-        la pile monte à 7. L’<b>Exécution</b> du Voleur inflige 2 × le Poison actuel, sans consommer la pile.
+        10 Poison sur un ennemi : 10 dégâts au début de son tour, puis 5, 2 et 1, soit 18 dégâts en tout. La pile fond vite : rechargez-la
+        souvent. Si vous ajoutez 4 Poison alors qu’il en reste 5, la pile monte à 9. L’<b>Exécution</b> du Voleur inflige 2 × le Poison actuel, sans consommer la pile.
       </p>
     </div>
   );

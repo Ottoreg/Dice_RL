@@ -196,7 +196,6 @@ button {
 }
 
 .die {
-  --die-size: 78px;
   position: relative;
   width: var(--die-size);
   height: var(--die-size);
@@ -279,12 +278,12 @@ button {
   font-size: 1rem;
   z-index: 2;
 }
-.die.locked {
-  transform: translateY(6px);
-}
 .die.locked .cube-face {
   border-color: var(--gold);
   box-shadow: inset 0 0 14px rgba(242, 195, 91, 0.45);
+}
+.die.locked {
+  filter: drop-shadow(0 0 8px rgba(242, 195, 91, 0.75));
 }
 .die.combo {
   animation: glow 1.2s ease-in-out infinite;
@@ -300,21 +299,22 @@ button {
 .die.rolling::after {
   animation: toss-shadow 0.9s ease-out;
 }
+/* Seen from above: the die grows as it leaves the table, then bounces. */
 @keyframes toss {
   0% {
-    transform: translateY(0);
+    transform: scale(1.25);
   }
   35% {
-    transform: translateY(-34px) translateZ(30px);
+    transform: scale(1.4);
   }
   70% {
-    transform: translateY(0);
+    transform: scale(1);
   }
   82% {
-    transform: translateY(-7px);
+    transform: scale(1.08);
   }
   100% {
-    transform: translateY(0);
+    transform: scale(1);
   }
 }
 @keyframes toss-shadow {
@@ -831,12 +831,27 @@ button {
   text-align: center;
   min-height: 1.2em;
 }
-.dice-row {
-  display: flex;
-  gap: 14px;
-  flex-wrap: wrap;
-  justify-content: center;
-  padding: 18px 0 8px;
+.dice-board {
+  position: relative;
+  width: 100%;
+  height: 240px;
+  border-radius: 18px;
+  border: 10px solid #5b3a22;
+  background:
+    radial-gradient(ellipse at 50% 40%, rgba(255, 255, 255, 0.07), transparent 65%),
+    repeating-linear-gradient(45deg, rgba(0, 0, 0, 0.05) 0 2px, transparent 2px 5px),
+    radial-gradient(ellipse at center, #2e6a48 0%, #1e4a32 65%, #153424 100%);
+  box-shadow:
+    inset 0 0 0 2px #7a5233,
+    inset 0 0 34px rgba(0, 0, 0, 0.65),
+    0 5px 0 #3a2312,
+    0 12px 24px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+.die-slot {
+  position: absolute;
+  width: var(--die-size);
+  height: var(--die-size);
 }
 .dice-actions {
   display: flex;
@@ -926,12 +941,16 @@ button {
   }
 }
 
+@media (max-width: 600px) {
+  .dice-board {
+    height: 210px;
+    border-width: 7px;
+  }
+}
+
 @media (max-width: 900px) {
   .player-zone {
     grid-template-columns: 1fr;
-  }
-  .die {
-    --die-size: 58px;
   }
   .enemy {
     width: 150px;
