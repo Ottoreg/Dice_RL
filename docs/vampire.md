@@ -1,6 +1,17 @@
 # 🧛 Vampire — fiche de conception
 
-Statut : **proposition, pas encore implémentée**. Les points marqués ❓ sont à trancher avant le développement.
+Statut : **implémenté**. Choix retenus :
+- Les sorts se paient en PV.
+- Le Saignement est un nouvel état.
+- Soif : +1 Force par tranche de 10 % de PV manquants (90–99 % de PV → +1, … 0–9 % → +10).
+- Les faces ❤️ restent dans ses récompenses comme piège.
+
+Réglages d'équilibrage (le bot gagnait 96 % avec la proposition initiale) :
+- 52 PV au lieu de 60.
+- Dé de départ plus faible : 🩸4 · ⚔️4 · ⚔️4 · 🦇2 · 🛡️4 · ❌.
+- Saignée : 8 PV pour 12 dégâts, au lieu de 6 PV pour 18.
+
+Le reste de la fiche décrit la proposition d'origine, les chiffres à jour sont ceux du jeu et du Codex.
 
 ## Fantasme de jeu
 

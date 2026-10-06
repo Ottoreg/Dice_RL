@@ -20,6 +20,10 @@ export type FaceKind =
   | 'haunt'
   | 'crown'
   | 'ghoul'
+  | 'swarm'
+  | 'bite'
+  | 'embrace'
+  | 'chalice'
   | 'blank';
 
 export interface Face {
@@ -27,7 +31,7 @@ export interface Face {
   value: number;
 }
 
-export type ClassId = 'warrior' | 'mage' | 'rogue' | 'skeleton' | 'necro';
+export type ClassId = 'warrior' | 'mage' | 'rogue' | 'skeleton' | 'necro' | 'vampire';
 
 /** Who an effect lands on: the player, an enemy (uid) or a minion ("m" + uid). */
 export type Target = 'player' | number | `m${number}`;
@@ -40,6 +44,8 @@ export interface Fighter {
   weak: number;
   vulnerable: number;
   poison: number;
+  /** When this fighter attacks, it loses this much HP, then the bleed is halved. */
+  bleed: number;
 }
 
 /** A move an enemy can telegraph. Every field present is applied. */
@@ -167,6 +173,10 @@ export interface CombatState {
   minions: Minion[];
   /** Extra damage for every minion (👑 Couronne de la liche). */
   minionBonus: number;
+  /** Vampire: the next enemy attack misses the player (🌫️ Forme de brume). */
+  dodge: boolean;
+  /** Vampire: drains heal double this turn (🦇 Festin). */
+  feast: boolean;
 }
 
 export type NodeType = 'combat' | 'elite' | 'rest' | 'treasure' | 'boss';

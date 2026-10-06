@@ -149,7 +149,7 @@ export function ClassSelect({ onPick }: { onPick: (id: ClassId) => void }) {
             <div className="class-spells">
               {c.spells.map((id) => (
                 <div key={id} className="mini-spell">
-                  {SPELLS[id].icon} <b>{SPELLS[id].name}</b> ({SPELLS[id].cost}✨) — {SPELLS[id].desc}
+                  {SPELLS[id].icon} <b>{SPELLS[id].name}</b> ({SPELLS[id].hpCost ? `${SPELLS[id].hpCost}❤️` : `${SPELLS[id].cost}✨`}) — {SPELLS[id].desc}
                 </div>
               ))}
             </div>

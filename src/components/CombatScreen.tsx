@@ -11,6 +11,8 @@ import {
   endPlayerTurn,
   enemyAct,
   minionAct,
+  playerStrength,
+  thirstBonus,
   minionKey,
   reroll,
   setTarget,
@@ -24,13 +26,13 @@ import { Die, ROLL_MS } from './Die';
 import { DiceBoard } from './DiceBoard';
 import { EffectLayer } from './Fx';
 
-const DAMAGE_KINDS = ['attack', 'dagger', 'cleave', 'staff', 'haunt', 'fire', 'frost', 'vamp'];
+const DAMAGE_KINDS = ['attack', 'dagger', 'cleave', 'staff', 'haunt', 'fire', 'frost', 'vamp', 'swarm', 'bite', 'embrace'];
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 interface Props {
   initial: CombatState;
-  onEnd: (result: { won: boolean; hp: number; dice: Face[][]; revived: boolean }) => void;
+  onEnd: (result: { won: boolean; hp: number; maxHp: number; dice: Face[][]; revived: boolean }) => void;
 }
 
 export function CombatScreen({ initial, onEnd }: Props) {
@@ -117,6 +119,11 @@ export function CombatScreen({ initial, onEnd }: Props) {
   }, [initial.enemies.length]);
 
   const preview = s.phase === 'rolling' ? computeCombos(s) : null;
+  const thirst = thirstBonus(s);
+  const playerExtras: [string, string, string][] = [];
+  if (thirst > 0) playerExtras.push(['🩸', `Soif +${thirst}`, `Soif : +${thirst} Force tant que vos PV restent à ce niveau`]);
+  if (s.dodge) playerExtras.push(['🌫️', '', 'Forme de brume : la prochaine attaque ennemie vous traverse']);
+  if (s.feast) playerExtras.push(['🍷', '', 'Festin : vos drains soignent le double ce tour']);
   const usableDice = s.dice.some((d) => !d.used);
 
   // Keyboard shortcuts.
@@ -210,7 +217,7 @@ export function CombatScreen({ initial, onEnd }: Props) {
               >
                 <div className="minion-emoji">{info.emoji}</div>
                 <div className="minion-name">{info.name}</div>
-                <HpBar f={{ hp: m.hp, maxHp: m.maxHp, block: 0, strength: 0, weak: 0, vulnerable: 0, poison: 0 }} />
+                <HpBar f={{ hp: m.hp, maxHp: m.maxHp, block: 0, strength: 0, weak: 0, vulnerable: 0, poison: 0, bleed: 0 }} />
                 <div className="minion-stats">
                   <span>⚔️ {m.dmg + s.minionBonus}</span>
                   {m.guard && <span className="kw">Garde</span>}
@@ -225,15 +232,17 @@ export function CombatScreen({ initial, onEnd }: Props) {
       )}
 
       <div className="player-zone">
-        <div className={`player-card ${shake === 'player' ? 'shake' : ''}`}>
+        <div className={`player-card ${shake === 'player' ? 'shake' : ''} ${thirst > 0 ? 'thirsty' : ''}`}>
           <div className="player-emoji">{cls.emoji}</div>
           <div>
             <div className="player-name">{cls.name}</div>
             <HpBar f={s.player} />
-            <Statuses f={s.player} />
-            <div className="mana">
-              ✨ Mana : <b>{s.player.mana}</b>
-            </div>
+            <Statuses f={s.player} extra={playerExtras} />
+            {s.classId !== 'vampire' && (
+              <div className="mana">
+                ✨ Mana : <b>{s.player.mana}</b>
+              </div>
+            )}
           </div>
           <EffectLayer anims={animsFor('player')} />
           <div className="floaters">{floatersFor('player')}</div>
@@ -245,7 +254,8 @@ export function CombatScreen({ initial, onEnd }: Props) {
               (s.rerollsLeft > 0
                 ? 'Cliquez sur les dés du plateau pour les garder 🔒, puis relancez les autres, comme au Yam !'
                 : 'Plus de relance : validez vos dés.')}
-            {s.phase === 'acting' && 'Cliquez sur un dé pour l’utiliser (cible : 🎯). Lancez des sorts avec votre mana.'}
+            {s.phase === 'acting' &&
+              `Cliquez sur un dé pour l’utiliser (cible : 🎯). Lancez des sorts avec ${s.classId === 'vampire' ? 'vos PV' : 'votre mana'}.`}
             {s.phase === 'enemy' && '…'}
           </div>
           <DiceBoard
@@ -267,7 +277,7 @@ export function CombatScreen({ initial, onEnd }: Props) {
                   mult={preview ? preview.mults[i] : d.mult}
                   value={
                     (preview ? dieValue({ ...s, suite: preview.suite }, d, preview.mults[i]) : dieValue(s, d)) +
-                    (DAMAGE_KINDS.includes(kind) ? s.player.strength : 0)
+                    (DAMAGE_KINDS.includes(kind) ? playerStrength(s) : 0)
                   }
                   joker={d.asKind ? FACE_INFO[d.asKind].icon : undefined}
                   combo={(preview ? preview.mults[i] : d.mult) > 1}
@@ -308,7 +318,7 @@ export function CombatScreen({ initial, onEnd }: Props) {
               <button key={id} className="spell" disabled={!canCast(s, id)} onClick={() => setS((x) => castSpell(x, id))} title={sp.desc}>
                 <span className="spell-icon">{sp.icon}</span>
                 <span className="spell-name">{sp.name}</span>
-                <span className="spell-cost">{sp.cost}✨</span>
+                <span className="spell-cost">{sp.hpCost ? `${sp.hpCost}❤️` : `${sp.cost}✨`}</span>
                 <span className="spell-desc">{sp.desc}</span>
               </button>
             );
@@ -326,7 +336,7 @@ export function CombatScreen({ initial, onEnd }: Props) {
         <div className="overlay">
           <div className="modal">
             <h2>{s.phase === 'won' ? '🏆 Victoire !' : '☠️ Défaite'}</h2>
-            <button className="btn primary" onClick={() => onEnd({ won: s.phase === 'won', hp: s.player.hp, dice: s.dice.map((d) => d.faces), revived: s.revived })}>
+            <button className="btn primary" onClick={() => onEnd({ won: s.phase === 'won', hp: s.player.hp, maxHp: s.player.maxHp, dice: s.dice.map((d) => d.faces), revived: s.revived })}>
               Continuer
             </button>
           </div>
@@ -349,12 +359,13 @@ export function HpBar({ f }: { f: Fighter }) {
   );
 }
 
-function Statuses({ f, frozen }: { f: Fighter; frozen?: boolean }) {
-  const items: [string, string, string][] = [];
+function Statuses({ f, frozen, extra = [] }: { f: Fighter; frozen?: boolean; extra?: [string, string, string][] }) {
+  const items: [string, string, string][] = [...extra];
   if (f.strength) items.push(['💪', `${f.strength}`, `Force : +${f.strength} dégâts par attaque`]);
   if (f.weak) items.push(['🥀', `${f.weak}`, `Faiblesse : -25% dégâts (${f.weak} tours)`]);
   if (f.vulnerable) items.push(['💔', `${f.vulnerable}`, `Vulnérable : +50% dégâts subis (${f.vulnerable} tours)`]);
   if (f.poison) items.push(['🧪', `${f.poison}`, `Poison : perd ${f.poison} PV au début du tour, puis le Poison est divisé par 2`]);
+  if (f.bleed) items.push(['🩸', `${f.bleed}`, `Saignement : perd ${f.bleed} PV quand il attaque, puis le Saignement est divisé par 2`]);
   if (frozen) items.push(['🧊', '', 'Gelé : passe son prochain tour']);
   return (
     <div className="statuses">

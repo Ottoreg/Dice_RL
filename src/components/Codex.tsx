@@ -120,6 +120,22 @@ const FACE_DETAILS: Record<FaceKind, { effect: string; notes: string[] }> = {
     effect: 'Relève une 🧌 Goule : X PV, X/2 dégâts, et elle se soigne de 2 à chaque coup porté (Vorace).',
     notes: ['Face rare du Nécromancien, obtenue uniquement en récompense.'],
   },
+  swarm: {
+    effect: 'Inflige X dégâts à tous les ennemis et vous soigne 1 PV par ennemi touché.',
+    notes: ['Face du Vampire. Ajoute votre Force (et la Soif) sur chaque ennemi.', 'Le soin est doublé par le sort Festin.'],
+  },
+  bite: {
+    effect: 'Inflige X dégâts à la cible et lui applique X/2 Saignement (arrondi au supérieur).',
+    notes: ['Le Saignement fait perdre des PV à l’ennemi quand il attaque : voir l’onglet États.'],
+  },
+  embrace: {
+    effect: 'Inflige X dégâts et vous soigne de 100 % des PV retirés à la cible.',
+    notes: ['Face rare du Vampire, obtenue uniquement en récompense.', 'Le soin est doublé par le sort Festin.'],
+  },
+  chalice: {
+    effect: 'Vous gagnez X PV max (et X PV) pour le reste de la partie.',
+    notes: ['Face rare du Vampire, obtenue uniquement en récompense.', 'Usage unique : la face devient ❌ Raté ensuite.'],
+  },
   cleave: {
     effect: 'Inflige X dégâts à tous les ennemis, comme le sort Tourbillon.',
     notes: ['Face rare du Guerrier, obtenue uniquement en récompense.', 'Ajoute votre Force à chaque ennemi touché.', 'Ne forme pas de combo avec 🔥 Feu.'],
@@ -136,7 +152,7 @@ const FACE_DETAILS: Record<FaceKind, { effect: string; notes: string[] }> = {
   blank: { effect: 'Ne fait rien.', notes: ['Ne compte pas dans les combos et empêche la Suite.', 'Au feu de camp, la Forge la transforme en 🛡️3.'] },
 };
 
-const FACE_ORDER: FaceKind[] = ['attack', 'staff', 'dagger', 'cleave', 'fire', 'frost', 'vamp', 'poison', 'venom', 'defend', 'heal', 'rebirth', 'magic', 'rage', 'bone', 'skull', 'raise', 'exhume', 'haunt', 'crown', 'ghoul', 'blank'];
+const FACE_ORDER: FaceKind[] = ['attack', 'staff', 'dagger', 'cleave', 'fire', 'frost', 'vamp', 'poison', 'venom', 'defend', 'heal', 'rebirth', 'magic', 'rage', 'bone', 'skull', 'raise', 'exhume', 'haunt', 'crown', 'ghoul', 'swarm', 'bite', 'embrace', 'chalice', 'blank'];
 
 function whereFound(kind: FaceKind): string[] {
   const out: string[] = [];
@@ -264,7 +280,7 @@ function RulesTab() {
         <li>
           <b>Face rare</b> : après un combat, une des 3 faces proposées peut être remplacée par une face rare de votre classe (15 % de chance,
           40 % contre une élite). Guerrier : 🪓 Fendoir. Mage : 💖 Renaissance. Voleur : ☣️ Venin (qu’il a aussi sur son premier dé au départ).
-          Squelette : 💀 Crâne hurlant. Nécromancien : 👑 Couronne de la liche ou 🧌 Charnier.
+          Squelette : 💀 Crâne hurlant. Nécromancien : 👑 Couronne de la liche ou 🧌 Charnier. Vampire : 💋 Étreinte ou 🍷 Calice.
         </li>
         <li>
           <b>Élite</b> : récompense de face + une relique.
@@ -291,6 +307,21 @@ const STATES: { icon: string; name: string; text: string }[] = [
     icon: '💀',
     name: 'Serviteurs',
     text: 'Alliés du Nécromancien (4 au maximum). À la fin de votre tour, avant les ennemis, chacun attaque la cible 🎯. Votre Force ne s’applique pas à eux. Les ennemis ne les visent pas, sauf avec une attaque de Balayage ou s’ils ont la Garde. Ils disparaissent à la fin du combat.',
+  },
+  {
+    icon: '🩸',
+    name: 'Saignement',
+    text: 'Quand une cible qui saigne attaque, elle perd autant de PV que son Saignement (l’armure ne protège pas), puis le Saignement est divisé par 2. S’il la tue, elle n’attaque pas. Appliqué par la 🦷 Morsure du Vampire.',
+  },
+  {
+    icon: '🧛',
+    name: 'Soif (Vampire)',
+    text: '+1 Force par tranche de 10 % de PV manquants : 90–99 % de PV → +1, 80–89 % → +2… 0–9 % → +10. Le bonus suit vos PV en temps réel.',
+  },
+  {
+    icon: '❤️',
+    name: 'Mort-vivant (Vampire)',
+    text: 'Le Vampire n’a pas de mana : ses sorts coûtent des PV (ignorant l’armure, impossible s’il en mourrait). Les faces ❤️ Soin le blessent au lieu de le soigner : attention aux récompenses piégées.',
   },
   { icon: '🤺', name: 'Garde', text: 'Les attaques ciblées des ennemis frappent ce serviteur à votre place, tant qu’il est debout.' },
   { icon: '🌊', name: 'Balayage', text: 'Attaque ennemie qui touche le joueur et tous ses serviteurs. Les élites et le Dragon en ont une.' },
@@ -375,7 +406,7 @@ function ClassesTab() {
                   <td>
                     {SPELLS[id].icon} {SPELLS[id].name}
                   </td>
-                  <td>{SPELLS[id].cost} ✨</td>
+                  <td>{SPELLS[id].hpCost ? `${SPELLS[id].hpCost} ❤️` : `${SPELLS[id].cost} ✨`}</td>
                   <td>{SPELLS[id].desc}</td>
                 </tr>
               ))}

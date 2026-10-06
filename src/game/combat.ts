@@ -88,12 +88,31 @@ function hurt(s: CombatState, who: { hp: number; block: number }, target: Target
 function heal(s: CombatState, who: Fighter, target: Target, amount: number) {
   const gained = Math.min(amount, who.maxHp - who.hp);
   who.hp += gained;
-  if (amount > 0) fx(s, target, `+${gained} PV`, 'heal');
+  if (gained > 0) fx(s, target, `+${gained} PV`, 'heal');
+}
+
+/** Vampire passive (Soif): +1 Strength per 10 % of max HP missing — 90–99 % → +1, …, 0–9 % → +10. */
+export function thirstBonus(s: CombatState): number {
+  if (s.classId !== 'vampire' || s.player.hp >= s.player.maxHp) return 0;
+  return Math.min(10, Math.max(0, 10 - Math.floor((s.player.hp * 10) / s.player.maxHp)));
+}
+
+/** The player's Strength including temporary bonuses (Soif). */
+export function playerStrength(s: CombatState): number {
+  return s.player.strength + thirstBonus(s);
 }
 
 function playerHits(s: CombatState, enemy: EnemyState, base: number): number {
-  const dmg = attackDamage(s.player, enemy, base);
+  const dmg = attackDamage({ ...s.player, strength: playerStrength(s) }, enemy, base);
   return hurt(s, enemy, enemy.uid, dmg);
+}
+
+/** Heal from a drain effect; Festin doubles it. */
+function drainHeal(s: CombatState, amount: number) {
+  const h = s.feast ? amount * 2 : amount;
+  if (h <= 0) return;
+  anim(s, 'player', 'heal');
+  heal(s, s.player, 'player', h);
 }
 
 function applyPoison(s: CombatState, enemy: EnemyState, amount: number) {
@@ -217,6 +236,7 @@ export function createCombat(run: RunState, enemyIds: string[]): CombatState {
       weak: 0,
       vulnerable: 0,
       poison: 0,
+      bleed: 0,
       moveIdx: def.pattern === 'cycle' ? 0 : randInt(0, def.moves.length - 1),
       frozen: false,
       dead: false,
@@ -234,6 +254,7 @@ export function createCombat(run: RunState, enemyIds: string[]): CombatState {
       weak: 0,
       vulnerable: 0,
       poison: 0,
+      bleed: 0,
       mana: cls.startMana,
     },
     enemies,
@@ -250,6 +271,8 @@ export function createCombat(run: RunState, enemyIds: string[]): CombatState {
     log: [`Combat contre ${enemies.map((e) => `${e.emoji} ${e.name}`).join(', ')} !`],
     events: [],
     anims: [],
+    dodge: false,
+    feast: false,
     vulnCarry: false,
     reviveAvailable: run.classId === 'skeleton' && !run.reviveUsed,
     revived: false,
@@ -287,8 +310,12 @@ export function startPlayerTurn(prev: CombatState): CombatState {
     checkEnd(s);
     if (s.player.hp <= 0) return s;
   }
-  const manaGain = (s.turn > 1 ? CLASSES[s.classId].manaPerTurn : 0) + (s.relics.includes('manaCrystal') ? 1 : 0);
+  const crystal = s.relics.includes('manaCrystal');
+  const manaGain = (s.turn > 1 ? CLASSES[s.classId].manaPerTurn : 0) + (crystal && s.classId !== 'vampire' ? 1 : 0);
   if (manaGain > 0) s.player.mana += manaGain;
+  if (crystal && s.classId === 'vampire' && s.turn > 1) heal(s, s.player, 'player', 2);
+  s.dodge = false;
+  s.feast = false;
 
   s.dice.forEach((d) => {
     d.locked = false;
@@ -485,9 +512,16 @@ export function useDie(prev: CombatState, i: number): CombatState {
       log(s, `${info.icon} Vous gagnez ${v} mana.`);
       break;
     case 'heal':
-      anim(s, 'player', 'heal');
-      heal(s, s.player, 'player', v);
-      log(s, `${info.icon} Vous vous soignez de ${v}.`);
+      if (s.classId === 'vampire') {
+        // Mort-vivant: healing burns the vampire.
+        anim(s, 'player', 'curse');
+        hurt(s, s.player, 'player', v, true);
+        log(s, `${info.icon} La lumière vous brûle : -${v} PV.`);
+      } else {
+        anim(s, 'player', 'heal');
+        heal(s, s.player, 'player', v);
+        log(s, `${info.icon} Vous vous soignez de ${v}.`);
+      }
       break;
     case 'poison':
       if (target) {
@@ -506,11 +540,7 @@ export function useDie(prev: CombatState, i: number): CombatState {
       if (target) {
         anim(s, target.uid, 'vamp');
         const lost = playerHits(s, target, v);
-        const h = Math.ceil(lost / 2);
-        if (h > 0) {
-          anim(s, 'player', 'heal');
-          heal(s, s.player, 'player', h);
-        }
+        drainHeal(s, Math.ceil(lost / 2));
         log(s, `${info.icon} Vous drainez ${target.name}.`);
       }
       break;
@@ -566,6 +596,45 @@ export function useDie(prev: CombatState, i: number): CombatState {
     case 'ghoul':
       summon(s, 'ghoul', v, Math.ceil(v / 2));
       break;
+    case 'swarm': {
+      let hit = 0;
+      for (const e of alive(s)) {
+        anim(s, e.uid, 'vamp');
+        playerHits(s, e, v);
+        hit++;
+      }
+      drainHeal(s, hit);
+      log(s, `${info.icon} Une nuée de chauves-souris s’abat sur les ennemis.`);
+      break;
+    }
+    case 'bite':
+      if (target) {
+        anim(s, target.uid, 'vamp');
+        playerHits(s, target, v);
+        if (target.hp > 0) {
+          const b = Math.ceil(v / 2);
+          target.bleed += b;
+          fx(s, target.uid, `🩸 +${b}`, 'debuff');
+        }
+        log(s, `${info.icon} Vous mordez ${target.name}.`);
+      }
+      break;
+    case 'embrace':
+      if (target) {
+        anim(s, target.uid, 'vamp');
+        drainHeal(s, playerHits(s, target, v));
+        log(s, `${info.icon} Étreinte mortelle sur ${target.name}.`);
+      }
+      break;
+    case 'chalice':
+      s.player.maxHp += v;
+      heal(s, s.player, 'player', v);
+      anim(s, 'player', 'heal');
+      fx(s, 'player', `🍷 +${v} PV max`, 'buff');
+      // One use only: the face is permanently replaced by a blank.
+      d.faces = d.faces.map((x, j) => (j === d.faceIdx ? { kind: 'blank', value: 0 } : x));
+      log(s, `${info.icon} Vous buvez au Calice : +${v} PV max pour la partie. La face devient ❌ Raté.`);
+      break;
     case 'cleave':
       for (const e of alive(s)) {
         anim(s, e.uid, 'slash');
@@ -599,6 +668,10 @@ export function canCast(s: CombatState, spellId: string) {
   if (s.phase !== 'acting' || s.player.mana < SPELLS[spellId].cost) return false;
   if ((spellId === 'corpseExplosion' || spellId === 'command') && s.minions.length === 0) return false;
   if (spellId === 'pact' && s.player.hp <= 6) return false;
+  const hpCost = SPELLS[spellId].hpCost ?? 0;
+  if (hpCost && s.player.hp <= hpCost) return false;
+  if (spellId === 'mistForm' && s.dodge) return false;
+  if (spellId === 'feast' && s.feast) return false;
   return true;
 }
 
@@ -607,6 +680,10 @@ export function castSpell(prev: CombatState, spellId: string): CombatState {
   const s = clone(prev);
   const spell = SPELLS[spellId];
   s.player.mana -= spell.cost;
+  if (spell.hpCost) {
+    anim(s, 'player', 'vamp');
+    hurt(s, s.player, 'player', spell.hpCost, true);
+  }
   const target = getTarget(s);
   log(s, `${spell.icon} Vous lancez ${spell.name} !`);
   switch (spellId) {
@@ -686,6 +763,22 @@ export function castSpell(prev: CombatState, spellId: string): CombatState {
     case 'pact':
       hurt(s, s.player, 'player', 6, true);
       summon(s, 'knight', 14, 5);
+      break;
+    case 'bloodletting':
+      if (target) {
+        anim(s, target.uid, 'vamp');
+        playerHits(s, target, 12);
+      }
+      break;
+    case 'mistForm':
+      s.dodge = true;
+      anim(s, 'player', 'smoke');
+      fx(s, 'player', '🌫️ Brume', 'buff');
+      break;
+    case 'feast':
+      s.feast = true;
+      anim(s, 'player', 'rage');
+      fx(s, 'player', '🍷 Festin', 'buff');
       break;
     case 'boneRain':
       if (target) {
@@ -781,14 +874,30 @@ export function enemyAct(prev: CombatState, idx: number): CombatState {
       e.strength += m.str;
       fx(s, e.uid, `💪 +${m.str}`, 'buff');
     }
-    if (m.dmg !== undefined) {
+    if (m.dmg !== undefined && e.bleed > 0) {
+      // Bleeding enemies lose HP when they attack, then the bleed is halved.
+      anim(s, e.uid, 'vamp');
+      log(s, `🩸 ${e.name} saigne en attaquant : -${e.bleed} PV.`);
+      hurt(s, e, e.uid, e.bleed, true);
+      e.bleed = Math.floor(e.bleed / 2);
+    }
+    const guardUp = !m.sweep && s.minions.some((x) => x.guard && x.hp > 0);
+    const dodged = m.dmg !== undefined && e.hp > 0 && s.dodge && !guardUp;
+    if (dodged) {
+      s.dodge = false;
+      fx(s, 'player', '🌫️ Esquive', 'buff');
+      log(s, `🌫️ Vous vous dissipez en brume : l’attaque de ${e.name} vous traverse.`);
+    }
+    if (m.dmg !== undefined && e.hp > 0) {
       const times = m.times ?? 1;
       const hitAnim = times > 1 ? 'dagger' : 'slash';
       anim(s, e.uid, 'lunge');
       if (m.sweep) {
         // Sweeping attack: the player and every minion are hit.
-        anim(s, 'player', hitAnim);
-        for (let t = 0; t < times && p.hp > 0; t++) hurt(s, p, 'player', attackDamage(e, p, m.dmg));
+        if (!dodged) {
+          anim(s, 'player', hitAnim);
+          for (let t = 0; t < times && p.hp > 0; t++) hurt(s, p, 'player', attackDamage(e, p, m.dmg));
+        }
         for (const mi of s.minions) {
           anim(s, minionKey(mi.uid), hitAnim);
           for (let t = 0; t < times && mi.hp > 0; t++) hurt(s, mi, minionKey(mi.uid), minionDamage(e, m.dmg));
@@ -801,7 +910,7 @@ export function enemyAct(prev: CombatState, idx: number): CombatState {
           if (guard) {
             anim(s, minionKey(guard.uid), hitAnim);
             hurt(s, guard, minionKey(guard.uid), minionDamage(e, m.dmg));
-          } else {
+          } else if (!dodged) {
             if (t === 0) anim(s, 'player', hitAnim);
             hurt(s, p, 'player', attackDamage(e, p, m.dmg));
           }

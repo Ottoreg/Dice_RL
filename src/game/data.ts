@@ -47,6 +47,10 @@ export const FACE_INFO: Record<FaceKind, { icon: string; name: string; color: st
     color: '#7cb342',
     desc: (v) => `Relève une 🧌 Goule (${v} PV, ${Math.ceil(v / 2)} dégâts) qui se soigne de 2 à chaque coup.`,
   },
+  swarm: { icon: '🦇', name: 'Nuée', color: '#7e57c2', desc: (v) => `Inflige ${v} dégâts à tous les ennemis, soigne 1 PV par ennemi touché.` },
+  bite: { icon: '🦷', name: 'Morsure', color: '#b71c1c', desc: (v) => `Inflige ${v} dégâts et applique ${Math.ceil(v / 2)} Saignement.` },
+  embrace: { icon: '💋', name: 'Étreinte', color: '#880e4f', desc: (v) => `Inflige ${v} dégâts et soigne 100 % des PV retirés.` },
+  chalice: { icon: '🍷', name: 'Calice', color: '#ad1457', desc: (v) => `+${v} PV max pour la partie, puis la face devient ❌ Raté.` },
   cleave: { icon: '🪓', name: 'Fendoir', color: '#ff7043', desc: (v) => `Inflige ${v} dégâts à tous les ennemis.` },
   rebirth: { icon: '💖', name: 'Renaissance', color: '#ff7eb6', desc: () => 'Rend tous vos PV, puis cette face devient ❌ Raté pour de bon.' },
   blank: { icon: '❌', name: 'Raté', color: '#555a66', desc: () => 'Ne fait rien.' },
@@ -64,7 +68,10 @@ export interface SpellDef {
   id: string;
   name: string;
   icon: string;
+  /** Mana cost. */
   cost: number;
+  /** HP cost (Vampire): paid from your health, ignoring armor. */
+  hpCost?: number;
   desc: string;
 }
 
@@ -93,6 +100,9 @@ export const SPELLS: Record<string, SpellDef> = {
   },
   command: { id: 'command', name: 'Commandement', icon: '📯', cost: 2, desc: 'Tous vos serviteurs attaquent immédiatement.' },
   pact: { id: 'pact', name: 'Pacte', icon: '🩸', cost: 3, desc: 'Perd 6 PV : relève un 🤺 Chevalier mort (14 PV, 5 dégâts, Garde).' },
+  bloodletting: { id: 'bloodletting', name: 'Saignée', icon: '🩸', cost: 0, hpCost: 8, desc: 'Inflige 12 dégâts.' },
+  mistForm: { id: 'mistForm', name: 'Forme de brume', icon: '🌫️', cost: 0, hpCost: 5, desc: 'La prochaine attaque ennemie ne vous touche pas.' },
+  feast: { id: 'feast', name: 'Festin', icon: '🍷', cost: 0, hpCost: 4, desc: 'Vos 🩸 Drain, 🦇 Nuée et 💋 Étreinte soignent le double ce tour.' },
   shatter: { id: 'shatter', name: 'Os brisés', icon: '💥', cost: 3, desc: 'Inflige 6 dégâts et 1 Vulnérable à tous.' },
 };
 
@@ -123,7 +133,7 @@ export interface ClassDef {
 }
 
 /** Faces that only appear as rare rewards / starting bonuses. */
-export const RARE_KINDS: FaceKind[] = ['venom', 'cleave', 'rebirth', 'skull', 'crown', 'ghoul'];
+export const RARE_KINDS: FaceKind[] = ['venom', 'cleave', 'rebirth', 'skull', 'crown', 'ghoul', 'embrace', 'chalice'];
 
 /** Most minions on the board at once. */
 export const MAX_MINIONS = 4;
@@ -240,6 +250,25 @@ export const CLASSES: Record<ClassId, ClassDef> = {
     facePool: [f('raise', 6), f('raise', 5), f('exhume', 4), f('haunt', 4), f('attack', 6), f('defend', 6), f('magic', 3), f('vamp', 4)],
     rarePool: [f('crown', 2), f('ghoul', 6)],
   },
+  vampire: {
+    id: 'vampire',
+    name: 'Vampire',
+    emoji: '🧛',
+    tagline: 'Paie ses sorts avec son sang et se soigne en drainant ses proies.',
+    maxHp: 52,
+    diceCount: 4,
+    rerolls: 2,
+    startMana: 0,
+    manaPerTurn: 0,
+    startStrength: 0,
+    poisonBonus: 0,
+    passive:
+      'Soif : +1 Force par tranche de 10 % de PV manquants (jusqu’à +10 sous 10 % de PV). Mort-vivant : pas de mana, ses sorts coûtent des PV, et les ❤️ Soins le blessent.',
+    die: [f('vamp', 4), f('attack', 4), f('attack', 4), f('swarm', 2), f('defend', 4), f('blank')],
+    spells: ['bloodletting', 'mistForm', 'feast'],
+    facePool: [f('vamp', 6), f('vamp', 7), f('swarm', 4), f('bite', 4), f('attack', 7), f('defend', 6), f('heal', 5)],
+    rarePool: [f('embrace', 5), f('chalice', 6)],
+  },
 };
 
 // ---------- Enemies ----------
@@ -336,7 +365,7 @@ export const RELICS: Record<string, RelicDef> = {
   extraDie: { id: 'extraDie', name: 'Dé supplémentaire', icon: '➕', desc: 'Gagne un dé (copie de votre premier dé).' },
   heartAmulet: { id: 'heartAmulet', name: 'Amulette de vie', icon: '💗', desc: '+12 PV max.' },
   ancestralShield: { id: 'ancestralShield', name: 'Bouclier ancestral', icon: '🪬', desc: 'Commence chaque combat avec 8 armure.' },
-  manaCrystal: { id: 'manaCrystal', name: 'Cristal de mana', icon: '🔮', desc: '+1 mana par tour.' },
+  manaCrystal: { id: 'manaCrystal', name: 'Cristal de mana', icon: '🔮', desc: '+1 mana par tour (Vampire : +2 PV par tour).' },
   vampFang: { id: 'vampFang', name: 'Croc de vampire', icon: '🧛', desc: 'Soigne 6 PV après chaque combat.' },
   hourglass: { id: 'hourglass', name: 'Sablier du joueur', icon: '⏳', desc: 'Les multiplicateurs de combo gagnent +0.25.' },
   toxicVial: { id: 'toxicVial', name: 'Fiole toxique', icon: '⚗️', desc: 'Chaque application de Poison gagne +2.' },
