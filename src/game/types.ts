@@ -15,6 +15,11 @@ export type FaceKind =
   | 'staff'
   | 'bone'
   | 'skull'
+  | 'raise'
+  | 'exhume'
+  | 'haunt'
+  | 'crown'
+  | 'ghoul'
   | 'blank';
 
 export interface Face {
@@ -22,7 +27,10 @@ export interface Face {
   value: number;
 }
 
-export type ClassId = 'warrior' | 'mage' | 'rogue' | 'skeleton';
+export type ClassId = 'warrior' | 'mage' | 'rogue' | 'skeleton' | 'necro';
+
+/** Who an effect lands on: the player, an enemy (uid) or a minion ("m" + uid). */
+export type Target = 'player' | number | `m${number}`;
 
 export interface Fighter {
   hp: number;
@@ -45,6 +53,8 @@ export interface Intent {
   vuln?: number;
   poison?: number;
   heal?: number;
+  /** Damage hits the player and every minion. */
+  sweep?: boolean;
 }
 
 export interface EnemyState extends Fighter {
@@ -55,6 +65,22 @@ export interface EnemyState extends Fighter {
   moveIdx: number;
   frozen: boolean;
   dead: boolean;
+}
+
+export type MinionKind = 'skeleton' | 'knight' | 'ghoul';
+
+export interface Minion {
+  uid: number;
+  kind: MinionKind;
+  hp: number;
+  maxHp: number;
+  dmg: number;
+  /** Always 0: minions have no armor, but share the damage code with fighters. */
+  block: number;
+  /** Single-target enemy attacks hit this minion instead of the player. */
+  guard: boolean;
+  /** Heals 2 each time it strikes. */
+  vorace: boolean;
 }
 
 export interface DieState {
@@ -80,7 +106,7 @@ export type CombatPhase = 'rolling' | 'acting' | 'enemy' | 'won' | 'lost';
 
 export interface FxEvent {
   id: number;
-  target: 'player' | number;
+  target: Target;
   text: string;
   tone: 'dmg' | 'block' | 'heal' | 'buff' | 'debuff' | 'mana';
 }
@@ -103,11 +129,13 @@ export type AnimKind =
   | 'smoke'
   | 'execute'
   | 'curse'
+  | 'summon'
+  | 'strike'
   | 'lunge';
 
 export interface AnimEvent {
   id: number;
-  target: 'player' | number;
+  target: Target;
   kind: AnimKind;
 }
 
@@ -135,6 +163,10 @@ export interface CombatState {
   reviveAvailable: boolean;
   /** The skeleton passive triggered during this fight. */
   revived: boolean;
+  /** Necromancer's servants (max 4). */
+  minions: Minion[];
+  /** Extra damage for every minion (👑 Couronne de la liche). */
+  minionBonus: number;
 }
 
 export type NodeType = 'combat' | 'elite' | 'rest' | 'treasure' | 'boss';

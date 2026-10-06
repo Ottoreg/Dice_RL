@@ -99,6 +99,27 @@ const FACE_DETAILS: Record<FaceKind, { effect: string; notes: string[] }> = {
     effect: 'Joker comme 🦴, et le groupe qu’il rejoint gagne +0,5 de multiplicateur.',
     notes: ['Face rare du Squelette, obtenue uniquement en récompense.', 'Même seul avec une autre face, il donne un bonus ×1,5 au groupe.'],
   },
+  raise: {
+    effect: 'Relève un 💀 Squelette serviteur avec X PV, qui inflige X dégâts à la fin de chacun de vos tours.',
+    notes: [
+      'Face du Nécromancien. Les combos agrandissent chaque Squelette : un Brelan de 🪦4 en relève 3 de 6 PV.',
+      'Un Carré (ou mieux) d’Invocation relève en plus un 🤺 Chevalier mort.',
+      'Plateau plein (4 serviteurs) : le serviteur le plus faible gagne X PV à la place.',
+    ],
+  },
+  exhume: {
+    effect: 'Soigne X PV à tous vos serviteurs.',
+    notes: ['Sans serviteur, relève à la place un Squelette de X/2 PV.', 'Ne dépasse pas les PV max des serviteurs.'],
+  },
+  haunt: { effect: 'Inflige X dégâts à la cible, +1 par serviteur sur le plateau.', notes: ['Ajoute votre Force (c’est votre attaque, pas celle des serviteurs).'] },
+  crown: {
+    effect: 'Tous vos serviteurs gagnent +X dégâts jusqu’à la fin du combat, y compris ceux relevés ensuite.',
+    notes: ['Face rare du Nécromancien, obtenue uniquement en récompense.'],
+  },
+  ghoul: {
+    effect: 'Relève une 🧌 Goule : X PV, X/2 dégâts, et elle se soigne de 2 à chaque coup porté (Vorace).',
+    notes: ['Face rare du Nécromancien, obtenue uniquement en récompense.'],
+  },
   cleave: {
     effect: 'Inflige X dégâts à tous les ennemis, comme le sort Tourbillon.',
     notes: ['Face rare du Guerrier, obtenue uniquement en récompense.', 'Ajoute votre Force à chaque ennemi touché.', 'Ne forme pas de combo avec 🔥 Feu.'],
@@ -115,7 +136,7 @@ const FACE_DETAILS: Record<FaceKind, { effect: string; notes: string[] }> = {
   blank: { effect: 'Ne fait rien.', notes: ['Ne compte pas dans les combos et empêche la Suite.', 'Au feu de camp, la Forge la transforme en 🛡️3.'] },
 };
 
-const FACE_ORDER: FaceKind[] = ['attack', 'staff', 'dagger', 'cleave', 'fire', 'frost', 'vamp', 'poison', 'venom', 'defend', 'heal', 'rebirth', 'magic', 'rage', 'bone', 'skull', 'blank'];
+const FACE_ORDER: FaceKind[] = ['attack', 'staff', 'dagger', 'cleave', 'fire', 'frost', 'vamp', 'poison', 'venom', 'defend', 'heal', 'rebirth', 'magic', 'rage', 'bone', 'skull', 'raise', 'exhume', 'haunt', 'crown', 'ghoul', 'blank'];
 
 function whereFound(kind: FaceKind): string[] {
   const out: string[] = [];
@@ -243,7 +264,7 @@ function RulesTab() {
         <li>
           <b>Face rare</b> : après un combat, une des 3 faces proposées peut être remplacée par une face rare de votre classe (15 % de chance,
           40 % contre une élite). Guerrier : 🪓 Fendoir. Mage : 💖 Renaissance. Voleur : ☣️ Venin (qu’il a aussi sur son premier dé au départ).
-          Squelette : 💀 Crâne hurlant.
+          Squelette : 💀 Crâne hurlant. Nécromancien : 👑 Couronne de la liche ou 🧌 Charnier.
         </li>
         <li>
           <b>Élite</b> : récompense de face + une relique.
@@ -265,6 +286,13 @@ function RulesTab() {
 // ---------- States ----------
 
 const STATES: { icon: string; name: string; text: string }[] = [
+  {
+    icon: '💀',
+    name: 'Serviteurs',
+    text: 'Alliés du Nécromancien (4 au maximum). À la fin de votre tour, avant les ennemis, chacun attaque la cible 🎯. Votre Force ne s’applique pas à eux. Les ennemis ne les visent pas, sauf avec une attaque de Balayage ou s’ils ont la Garde. Ils disparaissent à la fin du combat.',
+  },
+  { icon: '🤺', name: 'Garde', text: 'Les attaques ciblées des ennemis frappent ce serviteur à votre place, tant qu’il est debout.' },
+  { icon: '🌊', name: 'Balayage', text: 'Attaque ennemie qui touche le joueur et tous ses serviteurs. Les élites et le Dragon en ont une.' },
   { icon: '🛡️', name: 'Armure', text: 'Absorbe les dégâts avant les PV. Celle du joueur disparaît au début de son tour, celle des ennemis au début du leur. Le poison l’ignore.' },
   { icon: '💪', name: 'Force', text: 'Ajoute +1 dégât par point à chaque coup porté (attaque, dague, feu, givre, drain, sorts de dégâts). Dure tout le combat.' },
   {
@@ -405,6 +433,7 @@ function describeMove(m: Intent): string {
   if (m.weak) parts.push(`🥀 ${m.weak}`);
   if (m.vuln) parts.push(`💔 ${m.vuln}`);
   if (m.poison) parts.push(`🧪 ${m.poison}`);
+  if (m.sweep) parts.push('🌊 Balayage');
   return (m.label ? `${m.label} : ` : '') + (parts.join(' ') || 'rien');
 }
 

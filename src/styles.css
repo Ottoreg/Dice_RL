@@ -1514,3 +1514,80 @@ button {
   z-index: 2;
   animation: pop 0.3s ease-out;
 }
+
+/* ---------- Minions ---------- */
+.minions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  min-height: 40px;
+  padding: 4px 0;
+}
+.minions-empty {
+  color: var(--muted);
+  font-size: 0.85rem;
+  align-self: center;
+}
+.minion {
+  position: relative;
+  width: 120px;
+  background: linear-gradient(180deg, #262236, #1b1826);
+  border: 1px solid #4a4466;
+  border-radius: 10px;
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  animation: minion-rise 0.5s ease-out;
+}
+.minion .hpbar {
+  min-width: 0;
+  height: 14px;
+}
+.minion .hpbar-text {
+  line-height: 14px;
+  font-size: 0.7rem;
+}
+.minion-emoji {
+  font-size: 1.8rem;
+  line-height: 1.1;
+}
+.minion-name {
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+.minion-stats {
+  display: flex;
+  gap: 4px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  align-items: center;
+}
+.minion-stats .kw {
+  background: var(--gold);
+  color: #1b1408;
+  border-radius: 8px;
+  padding: 0 5px;
+  font-size: 0.65rem;
+}
+.minion.strike {
+  animation: minion-strike 0.4s ease-in-out;
+}
+@keyframes minion-rise {
+  from {
+    opacity: 0;
+    transform: translateY(24px) scaleY(0.6);
+  }
+}
+@keyframes minion-strike {
+  40% {
+    transform: translateY(-26px) scale(1.08);
+  }
+}
+@media (max-width: 600px) {
+  .minion {
+    width: 84px;
+  }
+}

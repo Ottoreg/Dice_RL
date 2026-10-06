@@ -10,19 +10,21 @@ import {
   dieValue,
   endPlayerTurn,
   enemyAct,
+  minionAct,
+  minionKey,
   reroll,
   setTarget,
   startPlayerTurn,
   toggleLock,
   useDie,
 } from '../game/combat';
-import { CLASSES, FACE_INFO, SPELLS } from '../game/data';
-import type { AnimEvent, CombatState, Face, Fighter, FxEvent } from '../game/types';
+import { CLASSES, FACE_INFO, MINIONS, SPELLS } from '../game/data';
+import type { AnimEvent, CombatState, Face, Fighter, FxEvent, Target } from '../game/types';
 import { Die, ROLL_MS } from './Die';
 import { DiceBoard } from './DiceBoard';
 import { EffectLayer } from './Fx';
 
-const DAMAGE_KINDS = ['attack', 'dagger', 'cleave', 'staff', 'fire', 'frost', 'vamp'];
+const DAMAGE_KINDS = ['attack', 'dagger', 'cleave', 'staff', 'haunt', 'fire', 'frost', 'vamp'];
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -34,7 +36,10 @@ interface Props {
 export function CombatScreen({ initial, onEnd }: Props) {
   const [s, setS] = useState(initial);
   const [floaters, setFloaters] = useState<FxEvent[]>([]);
-  const [shake, setShake] = useState<'player' | number | null>(null);
+  const [shake, setShake] = useState<Target | null>(null);
+  const [stage, setStage] = useState<'minions' | 'enemies'>('enemies');
+  const stateRef = useRef(s);
+  stateRef.current = s;
   const [anims, setAnims] = useState<AnimEvent[]>([]);
   const [settling, setSettling] = useState(false);
   const mounted = useRef(true);
@@ -80,13 +85,24 @@ export function CombatScreen({ initial, onEnd }: Props) {
     return () => clearTimeout(t);
   }, [s.rollId]);
 
-  const animsFor = (target: 'player' | number) => anims.filter((a) => a.target === target);
+  const animsFor = (target: Target) => anims.filter((a) => a.target === target);
 
   const runEnemyTurn = useCallback(async () => {
     if (busy.current) return;
     busy.current = true;
     setS((x) => endPlayerTurn(x));
     await sleep(350);
+    // Minions strike first (only those on the board when the turn ends).
+    const minionUids = stateRef.current.minions.map((m) => m.uid);
+    if (minionUids.length) {
+      setStage('minions');
+      for (const uid of minionUids) {
+        if (!mounted.current) return;
+        setS((x) => minionAct(x, uid));
+        await sleep(450);
+      }
+    }
+    setStage('enemies');
     if (!mounted.current) return;
     setS((x) => beginEnemyTurn(x));
     await sleep(450);
@@ -123,7 +139,7 @@ export function CombatScreen({ initial, onEnd }: Props) {
     return () => window.removeEventListener('keydown', onKey);
   }, [s.phase, s.dice.length, runEnemyTurn, settling]);
 
-  const floatersFor = (target: 'player' | number) =>
+  const floatersFor = (target: Target) =>
     floaters
       .filter((f) => f.target === target)
       .map((f, i) => (
@@ -177,8 +193,36 @@ export function CombatScreen({ initial, onEnd }: Props) {
               {t}
             </span>
           ))}
-        {s.phase === 'enemy' && <span className="enemy-turn">Tour des ennemis…</span>}
+        {s.phase === 'enemy' && <span className="enemy-turn">{stage === 'minions' ? 'Tour des serviteurs…' : 'Tour des ennemis…'}</span>}
       </div>
+
+      {(s.classId === 'necro' || s.minions.length > 0) && (
+        <div className="minions">
+          {s.minions.length === 0 && <span className="minions-empty">Aucun serviteur. Lancez des 🪦 pour relever les morts.</span>}
+          {s.minions.map((m) => {
+            const key = minionKey(m.uid);
+            const info = MINIONS[m.kind];
+            return (
+              <div
+                key={m.uid}
+                className={`minion ${shake === key ? 'shake' : ''} ${animsFor(key).some((a) => a.kind === 'strike') ? 'strike' : ''}`}
+                title={`${info.name} : ${m.dmg + s.minionBonus} dégâts par tour${m.guard ? ', Garde (prend les coups ciblés à votre place)' : ''}${m.vorace ? ', Vorace (se soigne de 2 en frappant)' : ''}`}
+              >
+                <div className="minion-emoji">{info.emoji}</div>
+                <div className="minion-name">{info.name}</div>
+                <HpBar f={{ hp: m.hp, maxHp: m.maxHp, block: 0, strength: 0, weak: 0, vulnerable: 0, poison: 0 }} />
+                <div className="minion-stats">
+                  <span>⚔️ {m.dmg + s.minionBonus}</span>
+                  {m.guard && <span className="kw">Garde</span>}
+                  {m.vorace && <span className="kw">Vorace</span>}
+                </div>
+                <EffectLayer anims={animsFor(key)} />
+                <div className="floaters">{floatersFor(key)}</div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       <div className="player-zone">
         <div className={`player-card ${shake === 'player' ? 'shake' : ''}`}>

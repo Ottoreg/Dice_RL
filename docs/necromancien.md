@@ -1,6 +1,17 @@
 # 🧟 Nécromancien — fiche de conception
 
-Statut : **proposition, pas encore implémentée**. Les points marqués ❓ sont à trancher avant le développement.
+Statut : **implémenté**. Choix retenus :
+- Les ennemis ne visent que le joueur, sauf un serviteur avec Garde. Les élites et le Dragon ont une attaque de Balayage.
+- 4 serviteurs au maximum.
+- La Force du joueur ne s'applique pas aux serviteurs.
+- Les serviteurs ne sont pas conservés entre les combats.
+
+Réglages d'équilibrage par rapport à la proposition initiale :
+- Les Squelettes infligent X dégâts au lieu de X/2.
+- 56 PV au lieu de 48.
+- Dé de départ : le ❌ est remplacé par 🛡️5 et 🛡️4 passe à 🛡️5.
+- Moisson rend aussi 3 PV par serviteur détruit.
+- Le Chevalier mort se relève avec un Carré d'Invocation (au lieu d'un Yam, impossible avec 4 dés).
 
 ## Fantasme de jeu
 
@@ -10,13 +21,13 @@ Un lanceur fragile qui ne se bat presque jamais lui-même : ses dés relèvent d
 
 | | |
 |---|---|
-| PV | 48 |
+| PV | 56 |
 | Dés | 4 |
 | Relances | 2 |
 | Mana | 1 au départ, rien par tour |
-| Passif **Moisson** | Chaque ennemi tué relève gratuitement un 💀 Squelette (3 PV, 2 dégâts). Chaque serviteur détruit vous rend 1 ✨ mana. |
+| Passif **Moisson** | Chaque ennemi tué relève gratuitement un 💀 Squelette (3 PV, 2 dégâts). Chaque serviteur détruit vous rend 1 ✨ mana et 3 PV. |
 
-Dé de départ (×4) : 💀4 · 💀4 · ⚔️4 · 🛡️4 · ✨2 · ❌
+Dé de départ (×4) : 🪦4 · 🪦4 · ⚔️4 · 🛡️5 · ✨2 · 🛡️5
 
 ## Les serviteurs
 
@@ -24,16 +35,16 @@ Un serviteur a des **PV**, des **dégâts** et peut avoir des **mots-clés**. Il
 
 | Serviteur | Origine | PV | Dégâts | Mot-clé |
 |---|---|---|---|---|
-| 💀 Squelette | Face 💀 Invocation, passif Moisson | valeur de la face | moitié de la valeur (arrondi au-dessus) | — |
-| ⚔️ Chevalier mort | Yam de 💀, ou sort Pacte | 14 | 5 | **Garde** : les attaques ciblées le frappent à la place du joueur |
-| 🧟 Goule | Rare : face 🪦 Charnier | 6 | 3 | **Vorace** : se soigne de 2 à chaque coup porté |
+| 💀 Squelette | Face 🪦 Invocation, passif Moisson | valeur de la face | valeur de la face (2 via Moisson) | — |
+| 🤺 Chevalier mort | Carré d'Invocation, ou sort Pacte | 14 | 5 | **Garde** : les attaques ciblées le frappent à la place du joueur |
+| 🧌 Goule | Rare : face 🧌 Charnier | 6 | 3 | **Vorace** : se soigne de 2 à chaque coup porté |
 
 - **Limite** : 4 serviteurs sur le plateau. Une invocation en trop donne à la place +X PV au serviteur le plus faible.
 - **Tour des serviteurs** : après « Fin du tour » et avant les ennemis, chaque serviteur attaque la cible 🎯, dans l'ordre d'invocation. Il y a une animation de charge vers l'ennemi.
-- **Combos** : ils marchent normalement. Un Brelan de 💀4 relève 3 Squelettes de 6 PV (4 × 1,5), qui frappent pour 3. Un **Yam de 💀** relève en plus un Chevalier mort.
+- **Combos** : ils marchent normalement. Un Brelan de 🪦4 relève 3 Squelettes de 6 PV (4 × 1,5), qui frappent pour 6. Un **Carré d'Invocation** relève en plus un Chevalier mort.
 - **Force** : la Force du joueur ne s'applique **pas** aux serviteurs, sinon ils deviendraient trop forts avec Cri de guerre ou la Rage.
 
-### ❓ Qui les ennemis attaquent-ils ?
+### Qui les ennemis attaquent-ils ? (option 1 retenue)
 
 C'est la décision qui change le plus le ressenti :
 
@@ -47,12 +58,12 @@ Avec l'option 1, il faut des intentions ennemies **« Balayage »** qui frappent
 
 | Face | Effet | Où |
 |---|---|---|
-| 💀 Invocation X | Relève un Squelette (X PV, X/2 dégâts) | Départ, récompenses (5, 6) |
+| 🪦 Invocation X | Relève un Squelette (X PV, X dégâts) | Départ, récompenses (5, 6) |
 | 🪦 Exhumer X | Soigne X PV à tous les serviteurs. S'il n'y en a aucun, relève un Squelette de X/2 PV | Récompenses (4) |
 | 👻 Hantise X | Inflige X dégâts à la cible + 1 dégât par serviteur | Récompenses (4) |
 | ⚔️ 🛡️ ✨ 🩸 ❤️ | Comme les autres classes | Départ, récompenses |
 | **Rare** 👑 Couronne de la liche | Tous les serviteurs gagnent +2 dégâts pour le combat | Récompense rare uniquement |
-| **Rare** 🪦 Charnier | Relève une 🧟 Goule | Récompense rare uniquement |
+| **Rare** 🧌 Charnier | Relève une 🧌 Goule | Récompense rare uniquement |
 
 ## Sorts
 
@@ -84,9 +95,7 @@ Avec l'option 1, il faut des intentions ennemies **« Balayage »** qui frappent
 
 Estimation : c'est le plus gros ajout depuis le prototype, environ deux fois le travail du Squelette. L'essentiel est dans le moteur (étape des serviteurs et ciblage).
 
-## Questions ouvertes
+## Pistes pour plus tard
 
-- ❓ Ciblage des ennemis : option 1, 2 ou 3 ci-dessus ?
-- ❓ Limite de 4 serviteurs, ou plus ?
-- ❓ Faut-il garder 1 Squelette d'un combat à l'autre, pour donner un sentiment d'armée qui grandit pendant la partie ?
-- ❓ La Force du joueur doit-elle profiter aux serviteurs ? La proposition est non.
+- Garder 1 Squelette d'un combat à l'autre, pour donner un sentiment d'armée qui grandit pendant la partie.
+- Des reliques propres aux serviteurs (+1 PV à chaque invocation, Garde sur le premier serviteur, etc.).

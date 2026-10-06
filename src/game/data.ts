@@ -1,4 +1,4 @@
-import type { ClassId, Face, FaceKind, Intent } from './types';
+import type { ClassId, Face, FaceKind, Intent, MinionKind } from './types';
 
 // ---------- Dice faces ----------
 
@@ -26,6 +26,26 @@ export const FACE_INFO: Record<FaceKind, { icon: string; name: string; color: st
     name: 'Crâne hurlant',
     color: '#eceff1',
     desc: (v) => `Joker de valeur ${v} : rejoint votre plus grand groupe, dont le multiplicateur gagne +0,5.`,
+  },
+  raise: {
+    icon: '🪦',
+    name: 'Invocation',
+    color: '#9e9e9e',
+    desc: (v) => `Relève un 💀 Squelette serviteur (${v} PV, ${v} dégâts par tour).`,
+  },
+  exhume: {
+    icon: '⚰️',
+    name: 'Exhumer',
+    color: '#8d6e63',
+    desc: (v) => `Soigne ${v} PV à tous vos serviteurs. Sans serviteur, relève un Squelette de ${Math.ceil(v / 2)} PV.`,
+  },
+  haunt: { icon: '👻', name: 'Hantise', color: '#b39ddb', desc: (v) => `Inflige ${v} dégâts à la cible, +1 par serviteur.` },
+  crown: { icon: '👑', name: 'Couronne de la liche', color: '#ffca28', desc: (v) => `Tous vos serviteurs gagnent +${v} dégâts pour le combat.` },
+  ghoul: {
+    icon: '🧌',
+    name: 'Charnier',
+    color: '#7cb342',
+    desc: (v) => `Relève une 🧌 Goule (${v} PV, ${Math.ceil(v / 2)} dégâts) qui se soigne de 2 à chaque coup.`,
   },
   cleave: { icon: '🪓', name: 'Fendoir', color: '#ff7043', desc: (v) => `Inflige ${v} dégâts à tous les ennemis.` },
   rebirth: { icon: '💖', name: 'Renaissance', color: '#ff7eb6', desc: () => 'Rend tous vos PV, puis cette face devient ❌ Raté pour de bon.' },
@@ -64,6 +84,15 @@ export const SPELLS: Record<string, SpellDef> = {
 
   boneRain: { id: 'boneRain', name: 'Pluie d’os', icon: '🦴', cost: 2, desc: 'Inflige 4 dégâts, +4 par 🦴 lancé ce tour.' },
   boneArmor: { id: 'boneArmor', name: 'Armure d’os', icon: '🩻', cost: 2, desc: 'Gagne 5 armure, +3 par 🦴 lancé ce tour.' },
+  corpseExplosion: {
+    id: 'corpseExplosion',
+    name: 'Explosion de cadavre',
+    icon: '💥',
+    cost: 2,
+    desc: 'Sacrifie votre serviteur le plus faible : ses PV en dégâts à tous les ennemis.',
+  },
+  command: { id: 'command', name: 'Commandement', icon: '📯', cost: 2, desc: 'Tous vos serviteurs attaquent immédiatement.' },
+  pact: { id: 'pact', name: 'Pacte', icon: '🩸', cost: 3, desc: 'Perd 6 PV : relève un 🤺 Chevalier mort (14 PV, 5 dégâts, Garde).' },
   shatter: { id: 'shatter', name: 'Os brisés', icon: '💥', cost: 3, desc: 'Inflige 6 dégâts et 1 Vulnérable à tous.' },
 };
 
@@ -94,7 +123,16 @@ export interface ClassDef {
 }
 
 /** Faces that only appear as rare rewards / starting bonuses. */
-export const RARE_KINDS: FaceKind[] = ['venom', 'cleave', 'rebirth', 'skull'];
+export const RARE_KINDS: FaceKind[] = ['venom', 'cleave', 'rebirth', 'skull', 'crown', 'ghoul'];
+
+/** Most minions on the board at once. */
+export const MAX_MINIONS = 4;
+
+export const MINIONS: Record<MinionKind, { name: string; emoji: string }> = {
+  skeleton: { name: 'Squelette', emoji: '💀' },
+  knight: { name: 'Chevalier mort', emoji: '🤺' },
+  ghoul: { name: 'Goule', emoji: '🧌' },
+};
 
 /** Faces that join another group in combos and copy its effect. */
 export const JOKER_KINDS: FaceKind[] = ['bone', 'skull'];
@@ -180,6 +218,25 @@ export const CLASSES: Record<ClassId, ClassDef> = {
     facePool: [f('attack', 8), f('attack', 7), f('defend', 7), f('bone', 4), f('bone', 5), f('magic', 3), f('vamp', 5), f('heal', 5)],
     rarePool: [f('skull', 3)],
   },
+  necro: {
+    id: 'necro',
+    name: 'Nécromancien',
+    emoji: '🧟',
+    tagline: 'Se bat rarement lui-même : ses serviteurs frappent et encaissent pour lui.',
+    maxHp: 56,
+    diceCount: 4,
+    rerolls: 2,
+    startMana: 1,
+    manaPerTurn: 0,
+    startStrength: 0,
+    poisonBonus: 0,
+    passive:
+      'Moisson : chaque ennemi tué relève un 💀 Squelette (3 PV, 2 dégâts) ; chaque serviteur détruit rend 1 ✨ et 3 PV. Les serviteurs (4 max) attaquent la cible à la fin de votre tour.',
+    die: [f('raise', 4), f('raise', 4), f('attack', 4), f('defend', 5), f('magic', 2), f('defend', 5)],
+    spells: ['corpseExplosion', 'command', 'pact'],
+    facePool: [f('raise', 6), f('raise', 5), f('exhume', 4), f('haunt', 4), f('attack', 6), f('defend', 6), f('magic', 3), f('vamp', 4)],
+    rarePool: [f('crown', 2), f('ghoul', 6)],
+  },
 };
 
 // ---------- Enemies ----------
@@ -203,9 +260,30 @@ export const ENEMIES: Record<string, EnemyDef> = {
   bandit: { id: 'bandit', name: 'Bandit', emoji: '🦹', hp: [40, 44], pattern: 'random', moves: [{ dmg: 8, vuln: 1 }, { dmg: 14 }, { block: 10, str: 2 }] },
   wolf: { id: 'wolf', name: 'Loup', emoji: '🐺', hp: [36, 40], pattern: 'random', moves: [{ dmg: 5, times: 2 }, { str: 2, block: 6, label: 'Hurlement' }, { dmg: 12 }] },
   // Elites
-  orc: { id: 'orc', name: 'Orc berserker', emoji: '👹', hp: [80, 88], pattern: 'cycle', moves: [{ str: 3, label: 'Rage' }, { dmg: 13 }, { dmg: 7, times: 2 }] },
-  golem: { id: 'golem', name: 'Golem de pierre', emoji: '🗿', hp: [100, 108], pattern: 'cycle', moves: [{ block: 18 }, { dmg: 20 }, { dmg: 8, vuln: 2 }] },
-  witch: { id: 'witch', name: 'Sorcière', emoji: '🧙‍♀️', hp: [72, 78], pattern: 'cycle', moves: [{ poison: 5, weak: 2, label: 'Malédiction' }, { dmg: 15 }, { heal: 14, block: 10 }] },
+  orc: {
+    id: 'orc',
+    name: 'Orc berserker',
+    emoji: '👹',
+    hp: [80, 88],
+    pattern: 'cycle',
+    moves: [{ str: 3, label: 'Rage' }, { dmg: 13, sweep: true, label: 'Moulinet' }, { dmg: 7, times: 2 }],
+  },
+  golem: {
+    id: 'golem',
+    name: 'Golem de pierre',
+    emoji: '🗿',
+    hp: [100, 108],
+    pattern: 'cycle',
+    moves: [{ block: 18 }, { dmg: 20, sweep: true, label: 'Séisme' }, { dmg: 8, vuln: 2 }],
+  },
+  witch: {
+    id: 'witch',
+    name: 'Sorcière',
+    emoji: '🧙‍♀️',
+    hp: [72, 78],
+    pattern: 'cycle',
+    moves: [{ poison: 5, weak: 2, label: 'Malédiction' }, { dmg: 15, sweep: true, label: 'Vague maudite' }, { heal: 14, block: 10 }],
+  },
   // Boss
   dragon: {
     id: 'dragon',
@@ -218,7 +296,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
       { dmg: 6, times: 3, label: 'Griffes' },
       { block: 20, str: 3, label: 'Écailles' },
       { label: 'Inspire profondément…' },
-      { dmg: 35, label: 'Souffle de feu' },
+      { dmg: 35, sweep: true, label: 'Souffle de feu' },
     ],
   },
 };

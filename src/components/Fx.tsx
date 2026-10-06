@@ -18,7 +18,7 @@ interface FxDef {
 }
 
 /** Visual recipe of every effect animation: a motion + a few particles. */
-const FX: Record<Exclude<AnimKind, 'lunge'>, FxDef> = {
+const FX: Record<Exclude<AnimKind, 'lunge' | 'strike'>, FxDef> = {
   slash: { motion: 'slash', flash: '#ff5c5c', particles: [{ r: -35 }] },
   dagger: { motion: 'slash', flash: '#ff8a5c', particles: [{ r: -35 }, { r: 35, d: 140 }] },
   fire: {
@@ -52,6 +52,7 @@ const FX: Record<Exclude<AnimKind, 'lunge'>, FxDef> = {
   smoke: { motion: 'burst', flash: '#90a4ae', particles: [{ e: '💨', x: -36, y: 0, s: 1.4 }, { e: '💨', x: 36, y: -10, d: 60, s: 1.4 }, { e: '💨', x: 0, y: -30, d: 120, s: 1.2 }] },
   execute: { motion: 'pop', flash: '#ffd54f', particles: [{ e: '🎯', s: 1.6 }, { e: '💥', s: 2, d: 280 }] },
   curse: { motion: 'spin', flash: '#9c6bff', particles: [{ e: '🌀', s: 1.6 }] },
+  summon: { motion: 'rise', flash: '#b0bec5', particles: [{ e: '🪦', s: 1.3 }, { e: '✨', x: -22, d: 120 }, { e: '✨', x: 22, d: 200 }] },
 };
 
 /** Renders the effect animations currently playing on one combatant. */
@@ -59,7 +60,7 @@ export function EffectLayer({ anims }: { anims: AnimEvent[] }) {
   return (
     <div className="fx-layer">
       {anims.map((a) => {
-        if (a.kind === 'lunge') return null;
+        if (a.kind === 'lunge' || a.kind === 'strike') return null;
         const def = FX[a.kind];
         return (
           <div key={a.id} className="fx">

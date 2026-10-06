@@ -1,11 +1,24 @@
-import { CLASSES, COMBO_MULT, COMBO_NAMES, ENEMIES, FACE_INFO, JOKER_KINDS, SPELLS, hasValue } from './data';
+import { CLASSES, COMBO_MULT, COMBO_NAMES, ENEMIES, FACE_INFO, JOKER_KINDS, MAX_MINIONS, MINIONS, SPELLS, hasValue } from './data';
 import { randInt } from './rng';
-import type { AnimKind, CombatState, Combo, DieState, EnemyState, FaceKind, Fighter, FxEvent, Intent, RunState } from './types';
+import type {
+  AnimKind,
+  CombatState,
+  Combo,
+  DieState,
+  EnemyState,
+  FaceKind,
+  Fighter,
+  FxEvent,
+  Intent,
+  Minion,
+  MinionKind,
+  RunState,
+  Target,
+} from './types';
 
 let fxCounter = 0;
 let uidCounter = 0;
 
-type Target = 'player' | number;
 
 const clone = (s: CombatState): CombatState => ({ ...structuredClone(s), events: [], anims: [] });
 
@@ -58,7 +71,7 @@ export function attackDamage(attacker: Fighter, defender: Fighter, base: number)
 }
 
 /** Apply raw damage to a fighter (block absorbs first). Returns HP lost. */
-function hurt(s: CombatState, who: Fighter, target: Target, amount: number, ignoreBlock = false): number {
+function hurt(s: CombatState, who: { hp: number; block: number }, target: Target, amount: number, ignoreBlock = false): number {
   let dmg = amount;
   if (!ignoreBlock && who.block > 0) {
     const absorbed = Math.min(who.block, dmg);
@@ -90,13 +103,77 @@ function applyPoison(s: CombatState, enemy: EnemyState, amount: number) {
   fx(s, enemy.uid, `🧪 +${total}`, 'debuff');
 }
 
+// ---------- Minions (Nécromancien) ----------
+
+let minionCounter = 0;
+export const minionKey = (uid: number): Target => `m${uid}`;
+
+/** Raise a minion; with a full board, the weakest minion is reinforced instead. */
+function summon(s: CombatState, kind: MinionKind, hp: number, dmg: number) {
+  const info = MINIONS[kind];
+  if (s.minions.length >= MAX_MINIONS) {
+    const weakest = s.minions.reduce((a, b) => (b.hp < a.hp ? b : a));
+    weakest.maxHp += hp;
+    weakest.hp += hp;
+    anim(s, minionKey(weakest.uid), 'heal');
+    fx(s, minionKey(weakest.uid), `+${hp} PV`, 'heal');
+    log(s, `${info.emoji} Plateau plein : ${MINIONS[weakest.kind].name} est renforcé (+${hp} PV).`);
+    return;
+  }
+  const m: Minion = { uid: ++minionCounter, kind, hp, maxHp: hp, dmg, block: 0, guard: kind === 'knight', vorace: kind === 'ghoul' };
+  s.minions.push(m);
+  anim(s, minionKey(m.uid), 'summon');
+  log(s, `${info.emoji} ${info.name} se relève (${hp} PV, ${dmg} dégâts).`);
+}
+
+/** A minion strikes the current target. The player's Strength does not apply. */
+function minionStrike(s: CombatState, m: Minion) {
+  const target = getTarget(s);
+  if (!target || m.hp <= 0) return;
+  let dmg = m.dmg + s.minionBonus;
+  if (target.vulnerable > 0) dmg = Math.floor(dmg * 1.5);
+  anim(s, minionKey(m.uid), 'strike');
+  anim(s, target.uid, 'slash');
+  hurt(s, target, target.uid, dmg);
+  if (m.vorace && m.hp < m.maxHp) {
+    const h = Math.min(2, m.maxHp - m.hp);
+    m.hp += h;
+    fx(s, minionKey(m.uid), `+${h} PV`, 'heal');
+  }
+  checkEnd(s);
+}
+
+/** End-of-turn attack of one minion (by uid), between the player's and the enemies' turns. */
+export function minionAct(prev: CombatState, uid: number): CombatState {
+  const m0 = prev.minions.find((m) => m.uid === uid);
+  if (prev.phase !== 'enemy' || !m0) return prev;
+  const s = clone(prev);
+  minionStrike(s, s.minions.find((m) => m.uid === uid)!);
+  if (s.phase === 'won' || s.phase === 'lost') return s;
+  s.phase = 'enemy';
+  return s;
+}
+
 function checkEnd(s: CombatState) {
+  let harvested = 0;
   for (const e of s.enemies) {
     if (e.hp <= 0 && !e.dead) {
       e.dead = true;
       e.hp = 0;
       log(s, `${e.emoji} ${e.name} est vaincu !`);
+      harvested++;
     }
+  }
+  // Necromancer passive (Moisson): fallen minions give mana back, fallen enemies rise as skeletons.
+  for (const m of s.minions.filter((x) => x.hp <= 0)) {
+    s.player.mana += 1;
+    fx(s, 'player', '✨ +1', 'mana');
+    if (s.player.hp > 0) heal(s, s.player, 'player', 3);
+    log(s, `${MINIONS[m.kind].emoji} ${MINIONS[m.kind].name} tombe en poussière (+1 ✨, +3 PV).`);
+  }
+  s.minions = s.minions.filter((x) => x.hp > 0);
+  if (s.classId === 'necro' && alive(s).length > 0) {
+    for (let i = 0; i < harvested; i++) summon(s, 'skeleton', 3, 2);
   }
   if (s.player.hp <= 0 && s.reviveAvailable) {
     s.reviveAvailable = false;
@@ -176,6 +253,8 @@ export function createCombat(run: RunState, enemyIds: string[]): CombatState {
     vulnCarry: false,
     reviveAvailable: run.classId === 'skeleton' && !run.reviveUsed,
     revived: false,
+    minions: [],
+    minionBonus: 0,
   };
   return startPlayerTurn(s);
 }
@@ -331,6 +410,11 @@ export function confirmDice(prev: CombatState): CombatState {
     anim(s, 'player', 'shield');
     log(s, '🎲 Double paire ! Vous gagnez 3 armure.');
   }
+  const raiseCombo = combos.find((c) => c.kind === 'raise' && c.count >= 4);
+  if (raiseCombo) {
+    summon(s, 'knight', 14, 5);
+    s.bonusText.push(`${raiseCombo.name} d’Invocation ! Un 🤺 Chevalier mort se relève`);
+  }
   s.phase = 'acting';
   return s;
 }
@@ -449,6 +533,39 @@ export function useDie(prev: CombatState, i: number): CombatState {
         log(s, `${info.icon} Coup de sceptre sur ${target.name}, +1 mana.`);
       }
       break;
+    case 'raise':
+      summon(s, 'skeleton', v, v);
+      break;
+    case 'exhume':
+      if (s.minions.length === 0) {
+        summon(s, 'skeleton', Math.ceil(v / 2), Math.ceil(v / 2));
+      } else {
+        for (const m of s.minions) {
+          const h = Math.min(v, m.maxHp - m.hp);
+          m.hp += h;
+          anim(s, minionKey(m.uid), 'heal');
+          if (h > 0) fx(s, minionKey(m.uid), `+${h} PV`, 'heal');
+        }
+        log(s, `${info.icon} Vos serviteurs se reconstituent (+${v} PV).`);
+      }
+      break;
+    case 'haunt':
+      if (target) {
+        anim(s, target.uid, 'curse');
+        playerHits(s, target, v + s.minions.length);
+        log(s, `${info.icon} Vos morts hantent ${target.name}.`);
+      }
+      break;
+    case 'crown':
+      s.minionBonus += v;
+      for (const m of s.minions) anim(s, minionKey(m.uid), 'rage');
+      anim(s, 'player', 'rage');
+      fx(s, 'player', `👑 Serviteurs +${v}`, 'buff');
+      log(s, `${info.icon} Vos serviteurs gagnent +${v} dégâts pour le combat.`);
+      break;
+    case 'ghoul':
+      summon(s, 'ghoul', v, Math.ceil(v / 2));
+      break;
     case 'cleave':
       for (const e of alive(s)) {
         anim(s, e.uid, 'slash');
@@ -479,7 +596,10 @@ export function bonesRolled(s: CombatState): number {
 }
 
 export function canCast(s: CombatState, spellId: string) {
-  return s.phase === 'acting' && s.player.mana >= SPELLS[spellId].cost;
+  if (s.phase !== 'acting' || s.player.mana < SPELLS[spellId].cost) return false;
+  if ((spellId === 'corpseExplosion' || spellId === 'command') && s.minions.length === 0) return false;
+  if (spellId === 'pact' && s.player.hp <= 6) return false;
+  return true;
 }
 
 export function castSpell(prev: CombatState, spellId: string): CombatState {
@@ -548,6 +668,24 @@ export function castSpell(prev: CombatState, spellId: string): CombatState {
         anim(s, e.uid, 'smoke');
         e.weak += 1;
       }
+      break;
+    case 'corpseExplosion': {
+      const victim = s.minions.reduce((a, b) => (b.hp < a.hp ? b : a));
+      const dmg = victim.hp;
+      victim.hp = 0;
+      anim(s, minionKey(victim.uid), 'fire');
+      for (const e of alive(s)) {
+        anim(s, e.uid, 'fire');
+        hurt(s, e, e.uid, e.vulnerable > 0 ? Math.floor(dmg * 1.5) : dmg);
+      }
+      break;
+    }
+    case 'command':
+      for (const m of [...s.minions]) minionStrike(s, m);
+      break;
+    case 'pact':
+      hurt(s, s.player, 'player', 6, true);
+      summon(s, 'knight', 14, 5);
       break;
     case 'boneRain':
       if (target) {
@@ -645,12 +783,31 @@ export function enemyAct(prev: CombatState, idx: number): CombatState {
     }
     if (m.dmg !== undefined) {
       const times = m.times ?? 1;
+      const hitAnim = times > 1 ? 'dagger' : 'slash';
       anim(s, e.uid, 'lunge');
-      anim(s, 'player', times > 1 ? 'dagger' : 'slash');
-      for (let t = 0; t < times && p.hp > 0; t++) {
-        hurt(s, p, 'player', attackDamage(e, p, m.dmg));
+      if (m.sweep) {
+        // Sweeping attack: the player and every minion are hit.
+        anim(s, 'player', hitAnim);
+        for (let t = 0; t < times && p.hp > 0; t++) hurt(s, p, 'player', attackDamage(e, p, m.dmg));
+        for (const mi of s.minions) {
+          anim(s, minionKey(mi.uid), hitAnim);
+          for (let t = 0; t < times && mi.hp > 0; t++) hurt(s, mi, minionKey(mi.uid), minionDamage(e, m.dmg));
+        }
+        log(s, `${e.emoji} ${e.name} frappe tout le monde (${attackDamage(e, p, m.dmg)}).`);
+      } else {
+        for (let t = 0; t < times && p.hp > 0; t++) {
+          // A minion with Guard takes single-target hits for the player.
+          const guard = s.minions.find((x) => x.guard && x.hp > 0);
+          if (guard) {
+            anim(s, minionKey(guard.uid), hitAnim);
+            hurt(s, guard, minionKey(guard.uid), minionDamage(e, m.dmg));
+          } else {
+            if (t === 0) anim(s, 'player', hitAnim);
+            hurt(s, p, 'player', attackDamage(e, p, m.dmg));
+          }
+        }
+        log(s, `${e.emoji} ${e.name} attaque${times > 1 ? ` ${times} fois` : ''} (${attackDamage(e, p, m.dmg)}).`);
       }
-      log(s, `${e.emoji} ${e.name} attaque${times > 1 ? ` ${times} fois` : ''} (${attackDamage(e, p, m.dmg)}).`);
     }
     if (m.weak || m.vuln) anim(s, 'player', 'curse');
     if (m.weak) {
@@ -676,6 +833,13 @@ export function enemyAct(prev: CombatState, idx: number): CombatState {
   return s;
 }
 
+/** Damage an enemy deals to a minion (minions have no armor or debuffs). */
+function minionDamage(e: EnemyState, base: number): number {
+  let d = base + e.strength;
+  if (e.weak > 0) d = Math.floor(d * 0.75);
+  return Math.max(0, d);
+}
+
 /** Text + icon describing an enemy intent, with damage computed against the player. */
 export function describeIntent(s: CombatState, e: EnemyState): { icon: string; text: string; tip: string } {
   if (e.frozen) return { icon: '🧊', text: 'Gelé', tip: 'Passera son prochain tour.' };
@@ -688,6 +852,14 @@ export function describeIntent(s: CombatState, e: EnemyState): { icon: string; t
     parts.push(m.times && m.times > 1 ? `${d}×${m.times}` : `${d}`);
     tips.push(`Attaque pour ${d}${m.times && m.times > 1 ? ` ×${m.times}` : ''}`);
     icon = '🗡️';
+    const guard = s.minions.find((x) => x.guard);
+    if (m.sweep) {
+      icon = '🌊';
+      tips.push('touche aussi tous vos serviteurs');
+    } else if (guard) {
+      parts.push(`➜${MINIONS[guard.kind].emoji}`);
+      tips.push(`vise ${MINIONS[guard.kind].name} (Garde)`);
+    }
   }
   if (m.block) {
     tips.push(`Se protège (${m.block})`);
