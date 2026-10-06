@@ -12,6 +12,7 @@ export type FaceKind =
   | 'venom'
   | 'cleave'
   | 'rebirth'
+  | 'staff'
   | 'blank';
 
 export interface Face {

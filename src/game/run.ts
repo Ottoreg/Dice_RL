@@ -1,5 +1,5 @@
-import { CLASSES, ENCOUNTERS, RARE_CHANCE, RELICS, hasValue } from './data';
-import { pick, randInt, shuffle } from './rng';
+import { CLASSES, CROSS_CHANCE, ENCOUNTERS, RARE_CHANCE, RELICS, hasValue } from './data';
+import { pick, shuffle } from './rng';
 import type { ClassId, Face, MapNode, NodeType, RunState } from './types';
 
 export const FLOORS = 12;
@@ -78,9 +78,15 @@ export function faceRewards(run: RunState, elite = false): Face[] {
   const faces = shuffle(cls.facePool)
     .slice(0, 3)
     .map((x) => ({ kind: x.kind, value: x.value === 0 ? 0 : x.value + (x.kind === 'rage' || x.kind === 'magic' ? 0 : bonus) }));
+  const slots = shuffle([0, 1, 2]);
+  // Sometimes a face from another class shows up.
+  if (cls.crossPool?.length && Math.random() < CROSS_CHANCE) {
+    const x = pick(cls.crossPool);
+    faces[slots.pop()!] = { kind: x.kind, value: x.value + bonus };
+  }
   // Sometimes a rare face replaces one of the offers (never scaled with depth).
   if (cls.rarePool?.length && Math.random() < (elite ? RARE_CHANCE.elite : RARE_CHANCE.combat)) {
-    faces[randInt(0, faces.length - 1)] = { ...pick(cls.rarePool) };
+    faces[slots.pop()!] = { ...pick(cls.rarePool) };
   }
   return faces;
 }

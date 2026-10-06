@@ -21,7 +21,7 @@ import { Die, ROLL_MS } from './Die';
 import { DiceBoard } from './DiceBoard';
 import { EffectLayer } from './Fx';
 
-const DAMAGE_KINDS = ['attack', 'dagger', 'fire', 'frost', 'vamp'];
+const DAMAGE_KINDS = ['attack', 'dagger', 'cleave', 'staff', 'fire', 'frost', 'vamp'];
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 

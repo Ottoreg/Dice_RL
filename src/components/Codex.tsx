@@ -82,6 +82,10 @@ const FACE_DETAILS: Record<FaceKind, { effect: string; notes: string[] }> = {
       'À la Forge : +1.',
     ],
   },
+  staff: {
+    effect: 'Inflige X dégâts à la cible et vous donne 1 mana.',
+    notes: ['Version mage de l’Attaque. Ajoute votre Force.', 'Le mana gagné reste 1, quel que soit le combo.', 'Ne profite pas de la Pierre à aiguiser.'],
+  },
   cleave: {
     effect: 'Inflige X dégâts à tous les ennemis, comme le sort Tourbillon.',
     notes: ['Face rare du Guerrier, obtenue uniquement en récompense.', 'Ajoute votre Force à chaque ennemi touché.', 'Ne forme pas de combo avec 🔥 Feu.'],
@@ -98,7 +102,7 @@ const FACE_DETAILS: Record<FaceKind, { effect: string; notes: string[] }> = {
   blank: { effect: 'Ne fait rien.', notes: ['Ne compte pas dans les combos et empêche la Suite.', 'Au feu de camp, la Forge la transforme en 🛡️3.'] },
 };
 
-const FACE_ORDER: FaceKind[] = ['attack', 'dagger', 'cleave', 'fire', 'frost', 'vamp', 'poison', 'venom', 'defend', 'heal', 'rebirth', 'magic', 'rage', 'blank'];
+const FACE_ORDER: FaceKind[] = ['attack', 'staff', 'dagger', 'cleave', 'fire', 'frost', 'vamp', 'poison', 'venom', 'defend', 'heal', 'rebirth', 'magic', 'rage', 'blank'];
 
 function whereFound(kind: FaceKind): string[] {
   const out: string[] = [];
@@ -109,6 +113,8 @@ function whereFound(kind: FaceKind): string[] {
     if (start.length) out.push(`${c.emoji} ${c.name}, dé de départ : ${start.join(', ')}`);
     if (c.startRare?.face.kind === kind) out.push(`${c.emoji} ${c.name}, dé ${c.startRare.die + 1} au départ : ${c.startRare.face.value}`);
     if (pool.length) out.push(`${c.emoji} ${c.name}, récompenses : ${pool.join(', ')}`);
+    const cross = (c.crossPool ?? []).filter((f) => f.kind === kind).map((f) => f.value);
+    if (cross.length) out.push(`${c.emoji} ${c.name}, récompense occasionnelle : ${cross.join(', ')}`);
     if (rare.length) out.push(`${c.emoji} ${c.name}, récompense rare : ${rare.join(', ')}`);
   }
   return out;
@@ -215,6 +221,10 @@ function RulesTab() {
         <li>
           <b>Combat</b> : choisissez une face parmi 3 (tirées des récompenses de votre classe) et remplacez la face de votre choix. À partir de
           l’étage 6, les faces proposées gagnent +1 (+2 dès l’étage 11), sauf ✨ et 💢.
+        </li>
+        <li>
+          <b>Face occasionnelle</b> : 15 % de chance qu’une des 3 faces proposées vienne d’une autre classe. Pour l’instant, seul le Guerrier en
+          a : 🗡️ Dague et 🧪 Poison.
         </li>
         <li>
           <b>Face rare</b> : après un combat, une des 3 faces proposées peut être remplacée par une face rare de votre classe (15 % de chance,
@@ -332,6 +342,14 @@ function ClassesTab() {
             {c.facePool.map((f, i) => (
               <FaceView key={i} face={f} />
             ))}
+            {c.crossPool?.length ? (
+              <>
+                {' '}· occasionnelles :{' '}
+                {c.crossPool.map((f, i) => (
+                  <FaceView key={`c${i}`} face={f} />
+                ))}
+              </>
+            ) : null}
             {c.rarePool?.length ? (
               <>
                 {' '}· rare :{' '}

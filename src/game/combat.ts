@@ -390,6 +390,16 @@ export function useDie(prev: CombatState, i: number): CombatState {
         log(s, `${info.icon} Le venin double le poison de ${target.name} (${target.poison}).`);
       }
       break;
+    case 'staff':
+      if (target) {
+        anim(s, target.uid, 'slash');
+        anim(s, 'player', 'magic');
+        playerHits(s, target, v);
+        s.player.mana += 1;
+        fx(s, 'player', '✨ +1', 'mana');
+        log(s, `${info.icon} Coup de sceptre sur ${target.name}, +1 mana.`);
+      }
+      break;
     case 'cleave':
       for (const e of alive(s)) {
         anim(s, e.uid, 'slash');

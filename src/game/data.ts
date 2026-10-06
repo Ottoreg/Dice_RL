@@ -14,6 +14,7 @@ export const FACE_INFO: Record<FaceKind, { icon: string; name: string; color: st
   rage: { icon: '💢', name: 'Rage', color: '#ff5c8a', desc: (v) => `Gagne ${v} Force pour le combat.` },
   vamp: { icon: '🩸', name: 'Drain', color: '#c2185b', desc: (v) => `Inflige ${v} dégâts, soigne la moitié.` },
   venom: { icon: '☣️', name: 'Venin', color: '#c6ff00', desc: (v) => `Applique ${v} Poison, puis double le Poison de la cible.` },
+  staff: { icon: '🪄', name: 'Sceptre', color: '#9575ff', desc: (v) => `Inflige ${v} dégâts à la cible et donne 1 mana.` },
   cleave: { icon: '🪓', name: 'Fendoir', color: '#ff7043', desc: (v) => `Inflige ${v} dégâts à tous les ennemis.` },
   rebirth: { icon: '💖', name: 'Renaissance', color: '#ff7eb6', desc: () => 'Rend tous vos PV, puis cette face devient ❌ Raté pour de bon.' },
   blank: { icon: '❌', name: 'Raté', color: '#555a66', desc: () => 'Ne fait rien.' },
@@ -72,6 +73,8 @@ export interface ClassDef {
   facePool: Face[];
   /** Rare faces that can show up as an end-of-combat reward. */
   rarePool?: Face[];
+  /** Faces from other classes that can occasionally show up as rewards. */
+  crossPool?: Face[];
 }
 
 /** Faces that only appear as rare rewards / starting bonuses. */
@@ -79,6 +82,9 @@ export const RARE_KINDS: FaceKind[] = ['venom', 'cleave', 'rebirth'];
 
 /** Chance that one of the three combat rewards is replaced by a rare face. */
 export const RARE_CHANCE = { combat: 0.15, elite: 0.4 };
+
+/** Chance that one of the three combat rewards comes from the class's cross pool. */
+export const CROSS_CHANCE = 0.15;
 
 export const CLASSES: Record<ClassId, ClassDef> = {
   warrior: {
@@ -96,8 +102,9 @@ export const CLASSES: Record<ClassId, ClassDef> = {
     passive: 'Robuste : commence chaque combat avec 1 Force.',
     die: [f('attack', 6), f('attack', 6), f('defend', 5), f('defend', 5), f('magic', 2), f('blank')],
     spells: ['heroicStrike', 'warCry', 'whirlwind'],
-    facePool: [f('attack', 9), f('attack', 8), f('defend', 9), f('rage', 1), f('vamp', 6), f('heal', 6), f('magic', 3), f('fire', 4)],
+    facePool: [f('attack', 9), f('attack', 8), f('defend', 9), f('rage', 1), f('vamp', 6), f('heal', 6), f('magic', 3)],
     rarePool: [f('cleave', 7)],
+    crossPool: [f('dagger', 3), f('poison', 4)],
   },
   mage: {
     id: 'mage',
@@ -114,7 +121,7 @@ export const CLASSES: Record<ClassId, ClassDef> = {
     passive: 'Afflux arcanique : +1 mana par tour, commence avec 2 mana.',
     die: [f('fire', 3), f('frost', 4), f('magic', 2), f('magic', 2), f('defend', 4), f('blank')],
     spells: ['fireball', 'frostNova', 'arcaneBarrier', 'icePrison'],
-    facePool: [f('fire', 5), f('frost', 6), f('magic', 3), f('magic', 4), f('defend', 7), f('heal', 5), f('attack', 7), f('vamp', 4)],
+    facePool: [f('fire', 5), f('frost', 6), f('magic', 3), f('magic', 4), f('defend', 7), f('heal', 5), f('staff', 6), f('vamp', 4)],
     rarePool: [f('rebirth')],
   },
   rogue: {
