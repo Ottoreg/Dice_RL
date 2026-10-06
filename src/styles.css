@@ -1493,6 +1493,7 @@ button {
   display: flex;
   flex-direction: column;
   align-items: center;
+  gap: 10px;
 }
 .forge-result p {
   display: flex;
@@ -1589,5 +1590,36 @@ button {
 @media (max-width: 600px) {
   .minion {
     width: 84px;
+  }
+}
+
+/* ---------- Super forge ---------- */
+.super-forge-banner {
+  background: linear-gradient(90deg, transparent, rgba(242, 195, 91, 0.25), transparent);
+  color: var(--gold);
+  font-weight: 700;
+  padding: 6px 24px;
+  border-radius: 20px;
+  animation: rare-glow 1.8s ease-in-out infinite;
+}
+.forge-rows {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.forge-cube.showcase {
+  animation: forge-showcase 5s linear infinite;
+}
+.forge-stage.super .forge-scene {
+  background: radial-gradient(ellipse at 50% 85%, rgba(255, 190, 60, 0.5), transparent 65%), radial-gradient(ellipse at center, #2f2538, #17121f);
+  border-color: var(--gold);
+}
+@keyframes forge-showcase {
+  from {
+    transform: rotateX(-20deg) rotateY(0deg);
+  }
+  to {
+    transform: rotateX(-20deg) rotateY(360deg);
   }
 }

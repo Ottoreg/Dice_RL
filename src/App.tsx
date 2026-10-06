@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { CombatScreen } from './components/CombatScreen';
 import { ClassSelect, EndScreen, FaceReward, MapScreen, RestScreen, TitleScreen, TopBar, TreasureScreen } from './components/Screens';
 import { createCombat } from './game/combat';
-import { addRelic, faceRewards, newRun, pickEncounter, relicChoices, replaceFace, upgradeFace } from './game/run';
+import { SUPER_FORGE_CHANCE } from './game/data';
+import { addRelic, faceRewards, newRun, pickEncounter, relicChoices, replaceFace, upgradeDie, upgradeFace } from './game/run';
 import type { CombatState, Face, MapNode, RunState } from './game/types';
 
 type Screen =
@@ -11,7 +12,7 @@ type Screen =
   | { kind: 'map' }
   | { kind: 'combat'; combat: CombatState; node: MapNode; key: number }
   | { kind: 'reward'; faces: Face[]; relic: string | null }
-  | { kind: 'rest' }
+  | { kind: 'rest'; superForge: boolean }
   | { kind: 'treasure'; choices: string[] }
   | { kind: 'end'; won: boolean };
 
@@ -32,7 +33,7 @@ export default function App() {
         setScreen({ kind: 'combat', combat: createCombat(r, pickEncounter(node.type, node.floor)), node, key: ++combatKey });
         break;
       case 'rest':
-        setScreen({ kind: 'rest' });
+        setScreen({ kind: 'rest', superForge: Math.random() < SUPER_FORGE_CHANCE });
         break;
       case 'treasure':
         setScreen({ kind: 'treasure', choices: relicChoices(r, 3) });
@@ -101,12 +102,13 @@ export default function App() {
       return (
         <RestScreen
           run={run}
+          superForge={screen.superForge}
           onHeal={() => {
             setRun({ ...run, hp: Math.min(run.maxHp, run.hp + Math.round(run.maxHp * 0.3)) });
             setScreen({ kind: 'map' });
           }}
           onUpgrade={(die, slot) => {
-            setRun(upgradeFace(run, die, slot));
+            setRun(screen.superForge ? upgradeDie(run, die) : upgradeFace(run, die, slot));
             setScreen({ kind: 'map' });
           }}
         />

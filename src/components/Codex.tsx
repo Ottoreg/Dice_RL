@@ -274,6 +274,7 @@ function RulesTab() {
         </li>
         <li>
           <b>Feu de camp</b> : soignez 30 % de vos PV max, ou forgez une face (+2, ou +1 pour ✨, 💢 et ☣️, et ❌ devient 🛡️3 ; 💖 ne peut pas être forgée).
+          Rarement (12 %), le feu de camp abrite une <b>super forge</b> qui améliore toutes les faces d’un dé d’un coup.
         </li>
         <li>
           Les ennemis normaux gagnent +2 % de PV par étage. Le Dragon ancien attend au 12e étage.

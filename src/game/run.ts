@@ -120,6 +120,12 @@ export function upgradedFace(old: Face): Face {
   return { kind: old.kind, value: old.value + (old.kind === 'rage' || old.kind === 'magic' || old.kind === 'venom' ? 1 : 2) };
 }
 
+/** Super forge: every face of the die that can be forged is upgraded. */
+export function upgradeDie(run: RunState, dieIdx: number): RunState {
+  const dice = run.dice.map((d, i) => (i === dieIdx ? d.map((f) => (canUpgrade(f) ? upgradedFace(f) : f)) : d));
+  return { ...run, dice };
+}
+
 export function upgradeFace(run: RunState, dieIdx: number, faceIdx: number): RunState {
   const old = run.dice[dieIdx][faceIdx];
   if (!canUpgrade(old)) return run;

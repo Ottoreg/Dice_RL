@@ -143,6 +143,9 @@ export const RARE_CHANCE = { combat: 0.15, elite: 0.4 };
 /** Chance that one of the three combat rewards comes from the class's cross pool. */
 export const CROSS_CHANCE = 0.15;
 
+/** Chance that a rest site holds a super forge, which upgrades a whole die. */
+export const SUPER_FORGE_CHANCE = 0.12;
+
 export const CLASSES: Record<ClassId, ClassDef> = {
   warrior: {
     id: 'warrior',

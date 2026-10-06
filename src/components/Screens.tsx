@@ -306,10 +306,13 @@ export function FaceReward({
 
 export function RestScreen({
   run,
+  superForge,
   onHeal,
   onUpgrade,
 }: {
   run: RunState;
+  /** This rest site has a super forge: the forge upgrades a whole die. */
+  superForge: boolean;
   onHeal: () => void;
   onUpgrade: (die: number, slot: number) => void;
 }) {
@@ -320,6 +323,7 @@ export function RestScreen({
     <div className="screen">
       <TopBar run={run} />
       <h2>🔥 Feu de camp</h2>
+      {superForge && mode === 'choose' && <div className="super-forge-banner">✦ Une super forge brûle ici ! Elle améliore un dé entier. ✦</div>}
       {mode === 'choose' ? (
         <div className="rest-options">
           <div className="reward-card" onClick={onHeal}>
@@ -327,22 +331,31 @@ export function RestScreen({
             <b>Se reposer</b>
             <span>Soigne {healAmt} PV.</span>
           </div>
-          <div className="reward-card" onClick={() => setMode('upgrade')}>
-            <span className="big-icon">⚒️</span>
-            <b>Forger</b>
-            <span>Améliore une face de dé (+2, ou +1 pour ✨, 💢 et ☣️). Un ❌ devient 🛡️3.</span>
-          </div>
+          {superForge ? (
+            <div className="reward-card rare" onClick={() => setMode('upgrade')}>
+              <span className="rare-badge">✦ Rare</span>
+              <span className="big-icon">⚒️</span>
+              <b>Super forge</b>
+              <span>Améliore toutes les faces d’un dé (+2, ou +1 pour ✨, 💢 et ☣️). Les ❌ deviennent 🛡️3.</span>
+            </div>
+          ) : (
+            <div className="reward-card" onClick={() => setMode('upgrade')}>
+              <span className="big-icon">⚒️</span>
+              <b>Forger</b>
+              <span>Améliore une face de dé (+2, ou +1 pour ✨, 💢 et ☣️). Un ❌ devient 🛡️3.</span>
+            </div>
+          )}
         </div>
       ) : mode === 'upgrade' || !pick ? (
         <>
-          <p>Choisissez la face à améliorer :</p>
+          <p>{superForge ? 'Choisissez le dé à améliorer (cliquez sur une de ses faces) :' : 'Choisissez la face à améliorer :'}</p>
           <DiceInventory
             dice={run.dice}
             onPick={(die, slot) => {
               setPick({ die, slot });
               setMode('preview');
             }}
-            canPick={canUpgrade}
+            canPick={superForge ? undefined : canUpgrade}
           />
           <button className="btn" onClick={() => setMode('choose')}>
             ← Retour
@@ -351,12 +364,18 @@ export function RestScreen({
       ) : mode === 'preview' ? (
         <>
           <p>
-            Dé {pick.die + 1} : confirmez la forge ou choisissez une autre face.
+            Dé {pick.die + 1} : confirmez la forge ou choisissez {superForge ? 'un autre dé' : 'une autre face'}.
           </p>
-          <ForgePreview faces={run.dice[pick.die]} slot={pick.slot} onConfirm={() => setMode('forging')} onCancel={() => setMode('upgrade')} />
+          <ForgePreview
+            faces={run.dice[pick.die]}
+            slot={pick.slot}
+            all={superForge}
+            onConfirm={() => setMode('forging')}
+            onCancel={() => setMode('upgrade')}
+          />
         </>
       ) : (
-        <ForgeAnimation faces={run.dice[pick.die]} slot={pick.slot} onDone={() => onUpgrade(pick.die, pick.slot)} />
+        <ForgeAnimation faces={run.dice[pick.die]} slot={pick.slot} all={superForge} onDone={() => onUpgrade(pick.die, pick.slot)} />
       )}
     </div>
   );
