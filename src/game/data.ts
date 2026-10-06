@@ -1,0 +1,208 @@
+import type { ClassId, Face, FaceKind, Intent } from './types';
+
+// ---------- Dice faces ----------
+
+export const FACE_INFO: Record<FaceKind, { icon: string; name: string; color: string; desc: (v: number) => string }> = {
+  attack: { icon: '⚔️', name: 'Attaque', color: '#e05252', desc: (v) => `Inflige ${v} dégâts à la cible.` },
+  dagger: { icon: '🗡️', name: 'Dague', color: '#d9785b', desc: (v) => `Inflige ${v} dégâts deux fois.` },
+  fire: { icon: '🔥', name: 'Feu', color: '#ff8a30', desc: (v) => `Inflige ${v} dégâts à tous les ennemis.` },
+  frost: { icon: '❄️', name: 'Givre', color: '#6cc6ff', desc: (v) => `Inflige ${v} dégâts et applique 1 Faiblesse.` },
+  defend: { icon: '🛡️', name: 'Défense', color: '#5b8de0', desc: (v) => `Gagne ${v} armure.` },
+  magic: { icon: '✨', name: 'Magie', color: '#b07cff', desc: (v) => `Gagne ${v} mana.` },
+  heal: { icon: '❤️', name: 'Soin', color: '#4fc27a', desc: (v) => `Soigne ${v} PV.` },
+  poison: { icon: '🧪', name: 'Poison', color: '#8bc34a', desc: (v) => `Applique ${v} Poison à la cible.` },
+  rage: { icon: '💢', name: 'Rage', color: '#ff5c8a', desc: (v) => `Gagne ${v} Force pour le combat.` },
+  vamp: { icon: '🩸', name: 'Drain', color: '#c2185b', desc: (v) => `Inflige ${v} dégâts, soigne la moitié.` },
+  blank: { icon: '❌', name: 'Raté', color: '#555a66', desc: () => 'Ne fait rien.' },
+};
+
+export const f = (kind: FaceKind, value = 0): Face => ({ kind, value });
+
+// ---------- Spells ----------
+
+export interface SpellDef {
+  id: string;
+  name: string;
+  icon: string;
+  cost: number;
+  desc: string;
+}
+
+export const SPELLS: Record<string, SpellDef> = {
+  heroicStrike: { id: 'heroicStrike', name: 'Frappe héroïque', icon: '💥', cost: 2, desc: 'Inflige 12 dégâts.' },
+  warCry: { id: 'warCry', name: 'Cri de guerre', icon: '📯', cost: 2, desc: 'Gagne 2 Force.' },
+  whirlwind: { id: 'whirlwind', name: 'Tourbillon', icon: '🌪️', cost: 3, desc: 'Inflige 7 dégâts à tous les ennemis.' },
+
+  fireball: { id: 'fireball', name: 'Boule de feu', icon: '☄️', cost: 3, desc: 'Inflige 15 dégâts.' },
+  frostNova: { id: 'frostNova', name: 'Nova de givre', icon: '🌨️', cost: 3, desc: 'Inflige 5 dégâts et 1 Faiblesse à tous.' },
+  arcaneBarrier: { id: 'arcaneBarrier', name: 'Barrière arcanique', icon: '🔷', cost: 2, desc: 'Gagne 10 armure.' },
+  icePrison: { id: 'icePrison', name: 'Prison de glace', icon: '🧊', cost: 4, desc: 'La cible passe son prochain tour.' },
+
+  poisonBlade: { id: 'poisonBlade', name: 'Lame empoisonnée', icon: '🐍', cost: 2, desc: 'Inflige 4 dégâts et 4 Poison.' },
+  smokeBomb: { id: 'smokeBomb', name: 'Fumigène', icon: '💨', cost: 2, desc: 'Gagne 8 armure, 1 Faiblesse à tous.' },
+  execute: { id: 'execute', name: 'Exécution', icon: '🎯', cost: 3, desc: 'Inflige 2× le Poison de la cible.' },
+};
+
+// ---------- Classes ----------
+
+export interface ClassDef {
+  id: ClassId;
+  name: string;
+  emoji: string;
+  tagline: string;
+  maxHp: number;
+  diceCount: number;
+  rerolls: number;
+  startMana: number;
+  manaPerTurn: number;
+  startStrength: number;
+  poisonBonus: number;
+  passive: string;
+  die: Face[];
+  spells: string[];
+  facePool: Face[];
+}
+
+export const CLASSES: Record<ClassId, ClassDef> = {
+  warrior: {
+    id: 'warrior',
+    name: 'Guerrier',
+    emoji: '🪓',
+    tagline: 'Robuste et brutal. Encaisse et frappe fort.',
+    maxHp: 72,
+    diceCount: 4,
+    rerolls: 2,
+    startMana: 0,
+    manaPerTurn: 0,
+    startStrength: 1,
+    poisonBonus: 0,
+    passive: 'Robuste : commence chaque combat avec 1 Force.',
+    die: [f('attack', 6), f('attack', 6), f('defend', 5), f('defend', 5), f('magic', 2), f('blank')],
+    spells: ['heroicStrike', 'warCry', 'whirlwind'],
+    facePool: [f('attack', 9), f('attack', 8), f('defend', 9), f('rage', 1), f('vamp', 6), f('heal', 6), f('magic', 3), f('fire', 4)],
+  },
+  mage: {
+    id: 'mage',
+    name: 'Mage',
+    emoji: '🧙',
+    tagline: 'Fragile mais maître des arcanes.',
+    maxHp: 52,
+    diceCount: 4,
+    rerolls: 2,
+    startMana: 2,
+    manaPerTurn: 1,
+    startStrength: 0,
+    poisonBonus: 0,
+    passive: 'Afflux arcanique : +1 mana par tour, commence avec 2 mana.',
+    die: [f('fire', 3), f('frost', 4), f('magic', 2), f('magic', 2), f('defend', 4), f('blank')],
+    spells: ['fireball', 'frostNova', 'arcaneBarrier', 'icePrison'],
+    facePool: [f('fire', 5), f('frost', 6), f('magic', 3), f('magic', 4), f('defend', 7), f('heal', 5), f('attack', 7), f('vamp', 4)],
+  },
+  rogue: {
+    id: 'rogue',
+    name: 'Voleur',
+    emoji: '🥷',
+    tagline: 'Rapide et sournois. Lance plus de dés.',
+    maxHp: 52,
+    diceCount: 5,
+    rerolls: 2,
+    startMana: 0,
+    manaPerTurn: 0,
+    startStrength: 0,
+    poisonBonus: 1,
+    passive: 'Toxines : chaque application de Poison gagne +1.',
+    die: [f('dagger', 2), f('dagger', 2), f('poison', 2), f('poison', 2), f('defend', 4), f('magic', 1)],
+    spells: ['poisonBlade', 'smokeBomb', 'execute'],
+    facePool: [f('dagger', 4), f('dagger', 3), f('poison', 5), f('poison', 4), f('defend', 6), f('magic', 2), f('vamp', 4), f('heal', 4)],
+  },
+};
+
+// ---------- Enemies ----------
+
+export interface EnemyDef {
+  id: string;
+  name: string;
+  emoji: string;
+  hp: [number, number];
+  moves: Intent[];
+  pattern: 'cycle' | 'random';
+}
+
+export const ENEMIES: Record<string, EnemyDef> = {
+  rat: { id: 'rat', name: 'Rat géant', emoji: '🐀', hp: [18, 22], pattern: 'random', moves: [{ dmg: 6 }, { dmg: 3, times: 2 }, { dmg: 4, weak: 1 }] },
+  bat: { id: 'bat', name: 'Chauve-souris', emoji: '🦇', hp: [12, 15], pattern: 'random', moves: [{ dmg: 3, times: 2 }, { dmg: 6 }] },
+  goblin: { id: 'goblin', name: 'Gobelin', emoji: '👺', hp: [24, 28], pattern: 'random', moves: [{ dmg: 8 }, { dmg: 4, block: 8 }, { dmg: 4, times: 2 }] },
+  mushroom: { id: 'mushroom', name: 'Champignon', emoji: '🍄', hp: [22, 26], pattern: 'cycle', moves: [{ poison: 4, label: 'Spores' }, { dmg: 7 }, { dmg: 4, block: 6 }] },
+  slime: { id: 'slime', name: 'Slime', emoji: '🟢', hp: [46, 52], pattern: 'random', moves: [{ dmg: 11 }, { dmg: 6, weak: 1 }, { block: 10, heal: 6 }] },
+  skeleton: { id: 'skeleton', name: 'Squelette', emoji: '💀', hp: [42, 48], pattern: 'cycle', moves: [{ dmg: 11 }, { block: 12 }, { dmg: 7, vuln: 1 }] },
+  bandit: { id: 'bandit', name: 'Bandit', emoji: '🦹', hp: [40, 44], pattern: 'random', moves: [{ dmg: 8, vuln: 1 }, { dmg: 14 }, { block: 10, str: 2 }] },
+  wolf: { id: 'wolf', name: 'Loup', emoji: '🐺', hp: [36, 40], pattern: 'random', moves: [{ dmg: 5, times: 2 }, { str: 2, block: 6, label: 'Hurlement' }, { dmg: 12 }] },
+  // Elites
+  orc: { id: 'orc', name: 'Orc berserker', emoji: '👹', hp: [80, 88], pattern: 'cycle', moves: [{ str: 3, label: 'Rage' }, { dmg: 13 }, { dmg: 7, times: 2 }] },
+  golem: { id: 'golem', name: 'Golem de pierre', emoji: '🗿', hp: [100, 108], pattern: 'cycle', moves: [{ block: 18 }, { dmg: 20 }, { dmg: 8, vuln: 2 }] },
+  witch: { id: 'witch', name: 'Sorcière', emoji: '🧙‍♀️', hp: [72, 78], pattern: 'cycle', moves: [{ poison: 5, weak: 2, label: 'Malédiction' }, { dmg: 15 }, { heal: 14, block: 10 }] },
+  // Boss
+  dragon: {
+    id: 'dragon',
+    name: 'Dragon ancien',
+    emoji: '🐉',
+    hp: [220, 220],
+    pattern: 'cycle',
+    moves: [
+      { dmg: 16 },
+      { dmg: 6, times: 3, label: 'Griffes' },
+      { block: 20, str: 3, label: 'Écailles' },
+      { label: 'Inspire profondément…' },
+      { dmg: 35, label: 'Souffle de feu' },
+    ],
+  },
+};
+
+export const ENCOUNTERS = {
+  easy: [['rat'], ['goblin'], ['bat', 'bat'], ['mushroom'], ['rat', 'bat']],
+  normal: [
+    ['slime'],
+    ['skeleton'],
+    ['goblin', 'rat'],
+    ['bandit'],
+    ['wolf'],
+    ['mushroom', 'bat'],
+    ['skeleton', 'rat'],
+    ['wolf', 'bat'],
+    ['goblin', 'mushroom'],
+  ],
+  elite: [['orc'], ['golem'], ['witch']],
+  boss: [['dragon']],
+};
+
+// ---------- Relics ----------
+
+export interface RelicDef {
+  id: string;
+  name: string;
+  icon: string;
+  desc: string;
+}
+
+export const RELICS: Record<string, RelicDef> = {
+  whetstone: { id: 'whetstone', name: 'Pierre à aiguiser', icon: '🪨', desc: 'Les faces ⚔️ Attaque et 🗡️ Dague gagnent +1.' },
+  loadedDie: { id: 'loadedDie', name: 'Dé pipé', icon: '🎲', desc: '+1 relance par tour.' },
+  extraDie: { id: 'extraDie', name: 'Dé supplémentaire', icon: '➕', desc: 'Gagne un dé (copie de votre premier dé).' },
+  heartAmulet: { id: 'heartAmulet', name: 'Amulette de vie', icon: '💗', desc: '+12 PV max.' },
+  ancestralShield: { id: 'ancestralShield', name: 'Bouclier ancestral', icon: '🪬', desc: 'Commence chaque combat avec 8 armure.' },
+  manaCrystal: { id: 'manaCrystal', name: 'Cristal de mana', icon: '🔮', desc: '+1 mana par tour.' },
+  vampFang: { id: 'vampFang', name: 'Croc de vampire', icon: '🧛', desc: 'Soigne 6 PV après chaque combat.' },
+  hourglass: { id: 'hourglass', name: 'Sablier du joueur', icon: '⏳', desc: 'Les multiplicateurs de combo gagnent +0.25.' },
+  toxicVial: { id: 'toxicVial', name: 'Fiole toxique', icon: '⚗️', desc: 'Chaque application de Poison gagne +2.' },
+};
+
+export const COMBO_NAMES: Record<number, string> = {
+  2: 'Paire',
+  3: 'Brelan',
+  4: 'Carré',
+  5: 'YAM !',
+  6: 'SUPER YAM !',
+  7: 'MÉGA YAM !',
+};
+
+export const COMBO_MULT: Record<number, number> = { 1: 1, 2: 1.25, 3: 1.5, 4: 1.75, 5: 2, 6: 2.25, 7: 2.5 };
